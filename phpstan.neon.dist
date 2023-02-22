@@ -1,0 +1,8 @@
+includes:
+    - vendor-bin/phpstan/vendor/phpstan/phpstan-strict-rules/rules.neon
+    - vendor-bin/phpstan/vendor/thecodingmachine/phpstan-strict-rules/phpstan-strict-rules.neon
+
+parameters:
+  level: max
+  paths:
+    - src

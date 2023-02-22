@@ -1,0 +1,27 @@
+{
+	"name": "PHP",
+	"image": "mcr.microsoft.com/devcontainers/php:0-8.0",
+	"customizations": {
+		"vscode": {
+      "settings": {
+				"phpstan.options": [ "--xdebug" ],
+				"phpstan.configFile": "phpstan.dist.neon,phpstan.neon.dist,phpstan.neon",
+				"psalm.psalmScriptPath": "vendor/bin/psalm-language-server"
+			},
+			"extensions": [
+				"streetsidesoftware.code-spell-checker",
+				"shevaua.phpcs",
+				"editorconfig.editorconfig",
+				"sanderronde.phpstan-vscode",
+				"getpsalm.psalm-vscode-plugin",
+				"xdebug.php-debug"
+			]
+		}
+	},
+	"postCreateCommand": {
+    "xdebug-fix": "echo \"xdebug.log = ${containerWorkspaceFolder}/xdebug.log\" | sudo tee -a /usr/local/etc/php/conf.d/xdebug.ini > /dev/null",
+		"composer": "composer install",
+		"yarn": "yarn install",
+		"init": "npx wp-env start && npx wp-env run cli wp import wp-content/plugins/woocommerce/sample-data/sample_products.xml --authors=create"
+  }
+}

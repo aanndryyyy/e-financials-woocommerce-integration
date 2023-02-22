@@ -1,0 +1,13 @@
+{
+  "devDependencies": {
+    "@wordpress/env": "^5.12.0"
+  },
+  "wp-env": {
+		"plugin-dir": "e-financials-integration",
+		"plugin-name": "e-Financials Integration"
+	},
+  "scripts": {
+    "wp-env": "wp-env",
+    "import:demo": "wp-env"
+  }
+}

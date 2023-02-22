@@ -1,0 +1,8 @@
+{
+  "require-dev": {
+      "php": "^8.0.2"
+  },
+  "require": {
+      "vimeo/psalm": "^5.7"
+  }
+}

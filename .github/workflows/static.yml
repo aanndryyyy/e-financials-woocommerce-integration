@@ -1,0 +1,69 @@
+name: Static Analysis
+
+on:
+  pull_request:
+
+jobs:
+  phpstan:
+    name: PHPStan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.0'
+          tools: composer:2.1
+          coverage: none
+
+      - name: Install Dependencies
+        uses: nick-invision/retry@v1
+        with:
+          timeout_minutes: 2
+          max_attempts: 2
+          command: composer update --no-interaction --no-progress
+
+      - name: Install PHPStan
+        uses: nick-invision/retry@v1
+        with:
+          timeout_minutes: 2
+          max_attempts: 52
+          command: composer bin phpstan update --no-interaction --no-progress
+
+      - name: Execute PHPStan
+        run: vendor/bin/phpstan analyze --no-progress
+
+  psalm:
+    name: Psalm
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.0'
+          tools: composer:2.1
+          coverage: none
+
+      - name: Install Dependencies
+        uses: nick-invision/retry@v1
+        with:
+          timeout_minutes: 2
+          max_attempts: 2
+          command: composer update --no-interaction --no-progress
+
+      - name: Install Psalm
+        uses: nick-invision/retry@v1
+        with:
+          timeout_minutes: 2
+          max_attempts: 2
+          command: composer bin psalm update --no-interaction --no-progress
+
+      - name: Execute Psalm
+        run: vendor/bin/psalm --no-progress --output-format=github
