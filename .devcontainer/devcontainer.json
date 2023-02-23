@@ -18,6 +18,10 @@
 			]
 		}
 	},
+	"features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+		"ghcr.io/devcontainers/features/node:1": {}
+	},
 	"postCreateCommand": {
     "xdebug-fix": "echo \"xdebug.log = ${containerWorkspaceFolder}/xdebug.log\" | sudo tee -a /usr/local/etc/php/conf.d/xdebug.ini > /dev/null",
 		"composer": "composer install",
