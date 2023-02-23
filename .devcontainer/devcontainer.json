@@ -25,6 +25,6 @@
 	"postCreateCommand": {
     "xdebug-fix": "echo \"xdebug.log = ${containerWorkspaceFolder}/xdebug.log\" | sudo tee -a /usr/local/etc/php/conf.d/xdebug.ini > /dev/null",
 		"composer": "composer install",
-		"yarn": "yarn install"
+		"npm": "npm install"
   }
 }
