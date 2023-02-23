@@ -1,6 +1,6 @@
 {
 	"name": "PHP",
-	"image": "mcr.microsoft.com/devcontainers/php:0-8.0",
+	"image": "mcr.microsoft.com/devcontainers/php:0-8.1",
 	"customizations": {
 		"vscode": {
       "settings": {

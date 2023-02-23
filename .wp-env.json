@@ -1,5 +1,5 @@
 {
-	"core": "WordPress/WordPress",
+	"core": "WordPress/WordPress#6.1.1",
 	"plugins": [ 
 		".",
 		"https://downloads.wordpress.org/plugin/woocommerce.7.4.0.zip",
@@ -10,6 +10,7 @@
 		"https://downloads.wordpress.org/theme/storefront.4.2.0.zip"
 	],
 	"config": {
+		"WP_DEFAULT_THEME": "storefront",
 		"WP_DEBUG_LOG": true,
 		"WP_DEBUG_DISPLAY": true,
 		"ALTERNATE_WP_CRON": true
