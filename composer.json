@@ -1,6 +1,6 @@
 {
     "name": "aanndryyyy/e-financials-woocommerce-integration",
-    "description": "WooCommerce e-Financials integration for easy bookkeeping (E-arveldaja WooCommerce liidestus).",
+    "description": "WooCommerce e-Financials integration for easy bookkeeping (e-Arveldaja WooCommerce liidestus).",
     "type": "wordpress-plugin",
     "license": "GPLv2",
     "autoload": {
