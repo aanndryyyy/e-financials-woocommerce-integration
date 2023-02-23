@@ -8,6 +8,7 @@
 	},
   "scripts": {
     "wp-env": "wp-env",
-    "import:demo": "wp-env"
+    "init": "wp-env start --update",
+    "import:demo": "wp-env run cli wp import wp-content/plugins/woocommerce/sample-data/sample_products.xml --authors=create"
   }
 }

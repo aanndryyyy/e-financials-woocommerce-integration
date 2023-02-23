@@ -25,7 +25,6 @@
 	"postCreateCommand": {
     "xdebug-fix": "echo \"xdebug.log = ${containerWorkspaceFolder}/xdebug.log\" | sudo tee -a /usr/local/etc/php/conf.d/xdebug.ini > /dev/null",
 		"composer": "composer install",
-		"yarn": "yarn install",
-		"init": "npx wp-env start && npx wp-env run cli wp import wp-content/plugins/woocommerce/sample-data/sample_products.xml --authors=create"
+		"yarn": "yarn install"
   }
 }
