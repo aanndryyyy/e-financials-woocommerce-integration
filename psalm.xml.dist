@@ -9,4 +9,8 @@
     <projectFiles>
         <directory name="src" />
     </projectFiles>
+
+    <stubs>
+        <file name="vendor-bin/psalm/vendor/php-stubs/wordpress-stubs/wordpress-stubs.php" />
+    </stubs>
 </psalm>

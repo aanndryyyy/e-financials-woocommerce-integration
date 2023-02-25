@@ -4,6 +4,7 @@
       "phpstan/phpstan": "^1.9",
       "phpstan/phpstan-strict-rules": "^1.4",
       "thecodingmachine/phpstan-strict-rules": "^1.0",
-      "ergebnis/phpstan-rules": "^1.0"
+      "ergebnis/phpstan-rules": "^1.0",
+			"szepeviktor/phpstan-wordpress": "^1.1"
   }
 }
