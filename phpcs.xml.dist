@@ -4,12 +4,14 @@
 
 	<config name="testVersion" value="8.0-"/>
 
-	<rule ref="WordPress-Core"/>
-	<rule ref="WordPress-Docs"/>
-	<rule ref="WordPress.WP.I18n"/>
-	<config name="text_domain" value="e-financials"/>
+	<rule ref="WordPress">
+		<exclude name="WordPress.Files.FileName.NotHyphenatedLowercase"/>
+		<exclude name="WordPress.Files.FileName.InvalidClassFileName"/>
+		<exclude name="Universal.Arrays.DisallowShortArraySyntax.Found"/>
+		<exclude name="WordPress.PHP.YodaConditions.NotYoda"/>
+	</rule>
 
-	<rule ref="WordPress.CodeAnalysis.EmptyStatement"/>
+	<config name="text_domain" value="e-financials"/>
 
 	<arg value="ps"/>
 	<arg name="extensions" value="php"/>
