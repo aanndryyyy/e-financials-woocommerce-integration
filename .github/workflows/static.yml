@@ -1,6 +1,7 @@
 name: Static Analysis
 
 on:
+  commit:
   pull_request:
 
 jobs:
@@ -19,19 +20,12 @@ jobs:
           tools: composer:2.1
           coverage: none
 
-      - name: Install Dependencies
+      - name: Install PHPStan
         uses: nick-invision/retry@v1
         with:
           timeout_minutes: 2
           max_attempts: 2
           command: composer update --no-interaction --no-progress
-
-      - name: Install PHPStan
-        uses: nick-invision/retry@v1
-        with:
-          timeout_minutes: 2
-          max_attempts: 52
-          command: composer bin phpstan update --no-interaction --no-progress
 
       - name: Execute PHPStan
         run: vendor/bin/phpstan analyze --no-progress
@@ -51,19 +45,12 @@ jobs:
           tools: composer:2.1
           coverage: none
 
-      - name: Install Dependencies
-        uses: nick-invision/retry@v1
-        with:
-          timeout_minutes: 2
-          max_attempts: 2
-          command: composer update --no-interaction --no-progress
-
       - name: Install Psalm
         uses: nick-invision/retry@v1
         with:
           timeout_minutes: 2
           max_attempts: 2
-          command: composer bin psalm update --no-interaction --no-progress
+          command: composer update --no-interaction --no-progress
 
       - name: Execute Psalm
         run: vendor/bin/psalm --no-progress --output-format=github
