@@ -4,6 +4,8 @@ includes:
   - vendor-bin/phpstan/vendor/szepeviktor/phpstan-wordpress/extension.neon
 
 parameters:
+  bootstrapFiles:
+    - vendor-bin/phpstan/vendor/php-stubs/woocommerce-stubs/woocommerce-stubs.php
   level: max
   paths:
     - src

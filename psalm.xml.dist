@@ -12,5 +12,6 @@
 
     <stubs>
         <file name="vendor-bin/psalm/vendor/php-stubs/wordpress-stubs/wordpress-stubs.php" />
+        <file name="vendor-bin/psalm/vendor/php-stubs/woocommerce-stubs/woocommerce-stubs.php" />
     </stubs>
 </psalm>

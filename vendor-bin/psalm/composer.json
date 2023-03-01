@@ -4,6 +4,7 @@
     "php-stubs/wordpress-stubs": "^6.1"
   },
   "require": {
-    "vimeo/psalm": "^5.7"
+    "vimeo/psalm": "^5.7",
+    "php-stubs/woocommerce-stubs": "^7.4"
   }
 }
