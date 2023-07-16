@@ -41,7 +41,7 @@ class EFinancialsIntegration extends \WC_Integration {
 		$this->init_form_fields();
 		$this->init_settings();
 
-		/** @phpstan-ignore-next-line */
+		// @phpstan-ignore-next-line
 		\add_action( 'woocommerce_update_options_integration_' . $this->id, array( $this, 'process_admin_options' ) );
 	}
 
