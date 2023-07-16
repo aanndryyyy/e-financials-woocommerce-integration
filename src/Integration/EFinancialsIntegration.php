@@ -40,6 +40,9 @@ class EFinancialsIntegration
 		$this->method_description = __( 'An integration demo to show you how easy it is to extend WooCommerce.', 'e-financials' );
 
 		$this->init_form_fields();
+		$this->init_settings();
+
+		\add_action( 'woocommerce_update_options_integration_' .  $this->id, array( $this, 'process_admin_options' ) );
 	}
 
 	/**
