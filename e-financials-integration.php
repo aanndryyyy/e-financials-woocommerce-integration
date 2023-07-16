@@ -33,6 +33,6 @@ $loader = require __DIR__ . '/vendor/autoload.php';
 /**
  * Begins execution of the plugin.
  */
-if ( \class_exists( Main::class ) ) {
+if ( \class_exists( Main::class ) && \class_exists( '\WC_Integration' ) ) {
 	( new Main( $loader->getPrefixesPsr4(), __NAMESPACE__ ) )->register();
 }
