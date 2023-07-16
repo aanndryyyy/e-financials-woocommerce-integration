@@ -22,9 +22,7 @@ use Exception;
  *
  * This is used to instantiate all classes.
  */
-abstract class AbstractMain
-	extends Autowiring
-	implements ServiceInterface {
+abstract class AbstractMain extends Autowiring implements ServiceInterface {
 
 	/**
 	 * Array of instantiated services.

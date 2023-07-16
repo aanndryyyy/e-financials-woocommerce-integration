@@ -17,8 +17,7 @@ use Aanndryyyy\EFinancialsPlugin\Services;
 /**
  * The main start class.
  */
-class RegisterIntegration
-	implements Services\ServiceInterface {
+class RegisterIntegration implements Services\ServiceInterface {
 
 	/**
 	 * {@inheritDoc}

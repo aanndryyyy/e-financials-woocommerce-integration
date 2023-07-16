@@ -15,8 +15,7 @@ namespace Aanndryyyy\EFinancialsPlugin\Integration;
 /**
  * The main start class.
  */
-class EFinancialsIntegration
-	extends \WC_Integration {
+class EFinancialsIntegration extends \WC_Integration {
 
 	const SETTING_KEY_API_KEY_ID = 'api_key_id';
 
@@ -42,6 +41,7 @@ class EFinancialsIntegration
 		$this->init_form_fields();
 		$this->init_settings();
 
+		/** @phpstan-ignore-next-line */
 		\add_action( 'woocommerce_update_options_integration_' . $this->id, array( $this, 'process_admin_options' ) );
 	}
 
