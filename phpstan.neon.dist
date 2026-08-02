@@ -9,3 +9,9 @@ parameters:
   level: max
   paths:
     - src
+  # WooCommerce + admin UI patterns that conflict with library-oriented strict rules.
+  ignoreErrors:
+    - identifier: cast.useless
+    - identifier: thecodingmachine.exceptionMustBeRethrown
+    - identifier: thecodingmachine.superglobalUsed
+    - identifier: thecodingmachine.emptyCatch

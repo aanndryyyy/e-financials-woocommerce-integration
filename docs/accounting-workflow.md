@@ -460,8 +460,8 @@ $client->salesInvoices()->deliver( $id, [
 | HPOS | yes | yes | yes |
 | Estonian reg code / VAT checkout | no | yes | P2 |
 
-### Open spike before coding payments Option B
+### Option B values (resolved for implementation)
 
-1. Confirm transaction `type` values for incoming customer payment on demo API.
-2. Confirm `related_table` string used when distributing a transaction onto a sale invoice.
-3. Verify whether cash-field invoices auto-set `payment_status=PAID` after `register` without a transaction.
+1. Incoming customer payment uses transaction `type = "D"` (Laekumine / money in). Outgoing uses `"C"`.
+2. Distributions onto a sale invoice use `related_table = "sale_invoices"` with `related_id` = sale invoice id.
+3. Cash-field invoices (`paid_in_cash` + `cash_*`) are recorded at create/register time (Option A); Option B creates an unpaid invoice then a settling transaction.

@@ -6,42 +6,57 @@ WooCommerce → [e-Arveldaja / e-Financials](https://e-arveldaja.rik.ee/) bookke
 
 API traffic goes through [`e-financials/php-client`](https://github.com/aanndryyyy/e-financials-php-client) (`composer require e-financials/php-client` once published on Packagist; until then Composer uses the GitHub VCS repository).
 
+## What this plugin does
+
+Background (Action Scheduler / WP-Cron) sync so checkout stays fast:
+
+1. **Client upsert** → e-Financials `clients`
+2. **Products ensure** → `products` (required `products_id` on invoice rows)
+3. **Sale invoice** create + **register**
+4. **Payment recording** — cash fields and/or `transactions` (gateway-agnostic; uses WC payment method ids)
+5. **Optional deliver** — email PDF / e-invoice
+6. **Credit invoices** on full/partial refunds
+7. **Admin UX** — settings, order column, metabox PDF, order actions, email note
+
+Configure under **WooCommerce → Settings → Integrations → e-Financials** (credentials, invoice series, template, payment mode map, deliver toggles).
+
 ## Sequences
-Main goal of the integration is to be invisible for the end user. This means, that everything is set up so that the reponses to client are immidiate. Processing and sending data to e-Financials will happen in the background.
+
+Main goal of the integration is to be invisible for the end user. Processing and sending data to e-Financials happens in the background.
 
 ### New Order
-
-<p align="center">
 
 ```mermaid
 sequenceDiagram
 	autonumber
-
 	actor C as Client
 	participant WC as WooCommerce
+	participant Q as Background queue
 	participant eF as e-Financials
-	
-	C->>+WC: New Order
-	WC-->>C: Order Accepted
-	
-	critical Send Data
-		WC->>eF: Create/Update Client
-		eF-->>WC: Client done
-		WC->>eF: Create Invoice
-		eF-->>WC: Invoice done
-		deactivate WC
-	option API Error
-		WC-->>WC: Log error, Try again
+
+	C->>+WC: New Order / payment
+	WC-->>C: Immediate response
+	WC->>Q: Enqueue SyncOrder
+	deactivate WC
+	Q->>eF: Upsert client
+	Q->>eF: Ensure products
+	Q->>eF: Create + register sale invoice
+	opt Payment
+		Q->>eF: Cash fields or transactions
+	end
+	opt Deliver
+		Q->>eF: deliver (email / e-invoice)
 	end
 ```
 
-</p>
-
 ### Products
-Products are syncronised using a custom WooCommerce Product field and e-Financials `products_id` field (this field is not visible in e-Financials interface). Store administrators will see a fancy selection, with product name & code. As there is no "last modified date" field in e-Financials, admins will be able to select which environment takes priority when syncronising products.
+
+Products are synchronised using product meta `_ef_products_id` and e-Financials `products_id`. Opt-in auto-sync on product save is available in settings. Shipping/fees use shared generic products (`WC-SHIP`, `WC-FEE`).
 
 ### Invoicing
-Custom invoices genereted by WooCommerce can be attached to sales invoices in e-Financials automatically. You can also do it the other way around - once the invoice has been created in e-Financials you can send the genereted PDF to the client.
+
+Sale invoices are created via the OpenAPI client, then registered. System PDFs can be downloaded from the order screen. Optional auto-deliver emails the customer after register.
 
 ### Invoice Series
-Invoice series can be synced to align invoice numbers in WooCommerce and e-Financials.
+
+Choose invoice series + template in settings before the first sync. Optionally push the WooCommerce order number as `number_suffix`.

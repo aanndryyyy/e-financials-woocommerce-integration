@@ -28,6 +28,7 @@ class Main extends AbstractMain {
 	 */
 	public function register(): void {
 
-		\add_action( 'plugins_loaded', [ $this, 'register_services' ] );
+		// Bootstrapped from plugins_loaded in the main plugin file.
+		$this->register_services();
 	}
 }

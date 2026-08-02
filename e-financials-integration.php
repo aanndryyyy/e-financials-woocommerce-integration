@@ -23,6 +23,8 @@ declare(strict_types=1);
 namespace Aanndryyyy\EFinancialsPlugin;
 
 use Aanndryyyy\EFinancialsPlugin\Main\Main;
+use Aanndryyyy\EFinancialsPlugin\Plugin;
+use Automattic\WooCommerce\Utilities\FeaturesUtil;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -31,8 +33,32 @@ if ( ! defined( 'ABSPATH' ) ) {
 $loader = require __DIR__ . '/vendor/autoload.php';
 
 /**
- * Begins execution of the plugin.
+ * Declare HPOS compatibility early (before WooCommerce init).
  */
-if ( \class_exists( Main::class ) && \class_exists( '\WC_Integration' ) ) {
-	( new Main( $loader->getPrefixesPsr4(), __NAMESPACE__ ) )->register();
-}
+\add_action(
+	'before_woocommerce_init',
+	static function (): void {
+
+		if ( ! \class_exists( FeaturesUtil::class ) ) {
+			return;
+		}
+
+		FeaturesUtil::declare_compatibility( 'custom_order_tables', Plugin::file(), true );
+	}
+);
+
+/**
+ * Begins execution of the plugin once WooCommerce is available.
+ */
+\add_action(
+	'plugins_loaded',
+	static function () use ( $loader ): void {
+
+		if ( ! \class_exists( Main::class ) || ! \class_exists( 'WooCommerce' ) ) {
+			return;
+		}
+
+		( new Main( $loader->getPrefixesPsr4(), __NAMESPACE__ ) )->register();
+	},
+	20
+);

@@ -1,9 +1,6 @@
 <?php
 /**
- * The file that defines the main start class.
- *
- * A class definition that includes attributes and functions used across both the
- * theme-facing side of the site and the admin area.
+ * WooCommerce integration settings for e-Financials.
  *
  * @package Arbictus\EFinancialsPlugin
  */
@@ -12,22 +9,50 @@ declare(strict_types=1);
 
 namespace Aanndryyyy\EFinancialsPlugin\Integration;
 
+use Aanndryyyy\EFinancialsPlugin\Settings\SettingsRepository;
+use EFinancials;
+use Throwable;
+
 /**
- * The main start class.
+ * WC_Integration settings screen.
  */
 class EFinancialsIntegration extends \WC_Integration {
 
-	const SETTING_KEY_API_KEY_ID = 'api_key_id';
+	public const SETTING_KEY_API_KEY_ID = 'api_key_id';
 
-	const SETTING_KEY_API_KEY_PUBLIC = 'api_key_public';
+	public const SETTING_KEY_API_KEY_PUBLIC = 'api_key_public';
 
-	const SETTING_KEY_API_KEY_PASSWORD = 'api_key_password';
+	public const SETTING_KEY_API_KEY_PASSWORD = 'api_key_password';
 
-	const SETTING_KEY_API_ENVIRONMENT = 'api_key_environment';
+	public const SETTING_KEY_API_ENVIRONMENT = 'api_key_environment';
 
-	const SETTING_KEY_API_ENVIRONMENT_OPTION_TEST = 'api_environment_test';
+	public const SETTING_KEY_API_ENVIRONMENT_OPTION_TEST = 'api_environment_test';
 
-	const SETTING_KEY_API_ENVIRONMENT_OPTION_LIVE = 'api_environment_live';
+	public const SETTING_KEY_API_ENVIRONMENT_OPTION_LIVE = 'api_environment_live';
+
+	public const SETTING_KEY_INVOICE_SERIES_ID = 'invoice_series_id';
+
+	public const SETTING_KEY_TEMPLATE_ID = 'cl_templates_id';
+
+	public const SETTING_KEY_SALE_ARTICLE_ID = 'cl_sale_articles_id';
+
+	public const SETTING_KEY_TERM_DAYS = 'term_days';
+
+	public const SETTING_KEY_USE_WC_ORDER_NUMBER = 'use_wc_order_number';
+
+	public const SETTING_KEY_DEFAULT_PAYMENT_MODE = 'default_payment_mode';
+
+	public const SETTING_KEY_DEFAULT_CASH_ACCOUNTS_ID = 'default_cash_accounts_id';
+
+	public const SETTING_KEY_DEFAULT_ACCOUNTS_DIMENSIONS_ID = 'default_accounts_dimensions_id';
+
+	public const SETTING_KEY_GATEWAY_MAP = 'gateway_payment_map';
+
+	public const SETTING_KEY_AUTO_DELIVER = 'auto_deliver';
+
+	public const SETTING_KEY_AUTO_DELIVER_EINVOICE = 'auto_deliver_einvoice';
+
+	public const SETTING_KEY_PRODUCT_AUTO_SYNC = 'product_auto_sync';
 
 	/**
 	 * Init and hook in the integration.
@@ -36,7 +61,7 @@ class EFinancialsIntegration extends \WC_Integration {
 
 		$this->id                 = 'efinancials_integration';
 		$this->method_title       = __( 'e-Financials', 'e-financials' );
-		$this->method_description = __( 'An integration demo to show you how easy it is to extend WooCommerce.', 'e-financials' );
+		$this->method_description = __( 'Sync WooCommerce orders to e-Arveldaja / e-Financials in the background.', 'e-financials' );
 
 		$this->init_form_fields();
 		$this->init_settings();
@@ -50,27 +75,35 @@ class EFinancialsIntegration extends \WC_Integration {
 	 */
 	public function init_form_fields(): void {
 
+		$series_options   = $this->safe_id_options( [ $this, 'fetch_invoice_series_options' ] );
+		$template_options = $this->safe_id_options( [ $this, 'fetch_template_options' ] );
+		$article_options  = $this->safe_id_options( [ $this, 'fetch_sale_article_options' ] );
+
 		$this->form_fields = [
-			self::SETTING_KEY_API_KEY_ID       => [
+			'api_section'                              => [
+				'title' => __( 'API connection', 'e-financials' ),
+				'type'  => 'title',
+			],
+			self::SETTING_KEY_API_KEY_ID               => [
 				'title'       => __( 'API Key ID', 'e-financials' ),
 				'type'        => 'text',
 				'description' => __( 'View guide <a href="https://abiinfo.rik.ee/en/node/303">here</a>.', 'e-financials' ),
 				'desc_tip'    => false,
 				'default'     => '',
 			],
-			self::SETTING_KEY_API_KEY_PUBLIC   => [
+			self::SETTING_KEY_API_KEY_PUBLIC           => [
 				'title'    => __( 'API Key Public', 'e-financials' ),
 				'type'     => 'text',
 				'desc_tip' => false,
 				'default'  => '',
 			],
-			self::SETTING_KEY_API_KEY_PASSWORD => [
+			self::SETTING_KEY_API_KEY_PASSWORD         => [
 				'title'    => __( 'API Key Password', 'e-financials' ),
 				'type'     => 'password',
 				'desc_tip' => false,
 				'default'  => '',
 			],
-			self::SETTING_KEY_API_ENVIRONMENT  => [
+			self::SETTING_KEY_API_ENVIRONMENT          => [
 				'title'       => __( 'API Environment', 'e-financials' ),
 				'type'        => 'select',
 				'label'       => __( 'Choose the environment', 'e-financials' ),
@@ -81,6 +114,258 @@ class EFinancialsIntegration extends \WC_Integration {
 					self::SETTING_KEY_API_ENVIRONMENT_OPTION_LIVE => __( 'Live Environment', 'e-financials' ),
 				],
 			],
+			'invoice_section'                          => [
+				'title' => __( 'Invoicing', 'e-financials' ),
+				'type'  => 'title',
+			],
+			self::SETTING_KEY_INVOICE_SERIES_ID        => [
+				'title'       => __( 'Invoice series', 'e-financials' ),
+				'type'        => 'select',
+				'description' => __( 'Required setup: choose the e-Financials invoice series used for new sale invoices.', 'e-financials' ),
+				'default'     => '',
+				'options'     => $series_options,
+			],
+			self::SETTING_KEY_TEMPLATE_ID              => [
+				'title'       => __( 'Invoice template', 'e-financials' ),
+				'type'        => 'select',
+				'description' => __( 'Sale invoice template (cl_templates_id). Required before first sync.', 'e-financials' ),
+				'default'     => '',
+				'options'     => $template_options,
+			],
+			self::SETTING_KEY_SALE_ARTICLE_ID          => [
+				'title'       => __( 'Default sale article', 'e-financials' ),
+				'type'        => 'select',
+				'description' => __( 'Optional default cl_sale_articles_id for invoice rows / products.', 'e-financials' ),
+				'default'     => '',
+				'options'     => $article_options,
+			],
+			self::SETTING_KEY_TERM_DAYS                => [
+				'title'   => __( 'Payment term (days)', 'e-financials' ),
+				'type'    => 'number',
+				'default' => '14',
+			],
+			self::SETTING_KEY_USE_WC_ORDER_NUMBER      => [
+				'title'   => __( 'Use WooCommerce order number as invoice suffix', 'e-financials' ),
+				'type'    => 'checkbox',
+				'label'   => __( 'Push WC order number as number_suffix', 'e-financials' ),
+				'default' => 'yes',
+			],
+			'payment_section'                          => [
+				'title'       => __( 'Payment recording', 'e-financials' ),
+				'type'        => 'title',
+				'description' => __( 'Gateway-agnostic: maps WooCommerce payment method ids to cash fields or transactions. No gateway plugin required.', 'e-financials' ),
+			],
+			self::SETTING_KEY_DEFAULT_PAYMENT_MODE     => [
+				'title'   => __( 'Default payment mode', 'e-financials' ),
+				'type'    => 'select',
+				'default' => SettingsRepository::PAYMENT_MODE_CASH,
+				'options' => [
+					SettingsRepository::PAYMENT_MODE_CASH => __( 'Cash fields on invoice', 'e-financials' ),
+					SettingsRepository::PAYMENT_MODE_TRANSACTION => __( 'Payment transaction', 'e-financials' ),
+					SettingsRepository::PAYMENT_MODE_OFF  => __( 'Off (invoice only)', 'e-financials' ),
+				],
+			],
+			self::SETTING_KEY_DEFAULT_CASH_ACCOUNTS_ID => [
+				'title'       => __( 'Default cash account id', 'e-financials' ),
+				'type'        => 'number',
+				'description' => __( 'Used for Option A (paid_in_cash) when the gateway map does not override.', 'e-financials' ),
+				'default'     => '',
+			],
+			self::SETTING_KEY_DEFAULT_ACCOUNTS_DIMENSIONS_ID => [
+				'title'       => __( 'Default accounts dimension id', 'e-financials' ),
+				'type'        => 'number',
+				'description' => __( 'Used for Option B (transactions) when the gateway map does not override.', 'e-financials' ),
+				'default'     => '',
+			],
+			self::SETTING_KEY_GATEWAY_MAP              => [
+				'title'       => __( 'Per-gateway payment map (JSON)', 'e-financials' ),
+				'type'        => 'textarea',
+				'description' => __( 'Example: {"bacs":{"mode":"transaction","accounts_dimensions_id":4},"cod":{"mode":"cash","cash_accounts_id":1010}}. Empty uses built-in defaults for bacs/cheque/cod.', 'e-financials' ),
+				'default'     => '',
+				'css'         => 'width:100%;min-height:120px;font-family:monospace',
+			],
+			'delivery_section'                         => [
+				'title' => __( 'Delivery & products', 'e-financials' ),
+				'type'  => 'title',
+			],
+			self::SETTING_KEY_AUTO_DELIVER             => [
+				'title'   => __( 'Auto-deliver invoice email after register', 'e-financials' ),
+				'type'    => 'checkbox',
+				'label'   => __( 'Send PDF email via e-Financials deliver API', 'e-financials' ),
+				'default' => 'no',
+			],
+			self::SETTING_KEY_AUTO_DELIVER_EINVOICE    => [
+				'title'   => __( 'Also send e-invoice (XML) when available', 'e-financials' ),
+				'type'    => 'checkbox',
+				'label'   => __( 'send_einvoice=true when can_send_einvoice', 'e-financials' ),
+				'default' => 'no',
+			],
+			self::SETTING_KEY_PRODUCT_AUTO_SYNC        => [
+				'title'   => __( 'Auto-sync products on save', 'e-financials' ),
+				'type'    => 'checkbox',
+				'label'   => __( 'Upsert e-Financials products when WooCommerce products are saved', 'e-financials' ),
+				'default' => 'no',
+			],
 		];
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	public function process_admin_options(): bool { // phpcs:ignore Squiz.Commenting.FunctionCommentThrowTag.Missing -- WC parent signature
+
+		$result = parent::process_admin_options();
+
+		$this->maybe_connection_ping();
+
+		return $result;
+	}
+
+	/**
+	 * Smoke-test credentials after save.
+	 */
+	private function maybe_connection_ping(): void {
+
+		$id       = (string) $this->get_option( self::SETTING_KEY_API_KEY_ID, '' );
+		$public   = (string) $this->get_option( self::SETTING_KEY_API_KEY_PUBLIC, '' );
+		$password = (string) $this->get_option( self::SETTING_KEY_API_KEY_PASSWORD, '' );
+
+		if ( $id === '' || $public === '' || $password === '' ) {
+			return;
+		}
+
+		try {
+			$live = $this->get_option( self::SETTING_KEY_API_ENVIRONMENT )
+				=== self::SETTING_KEY_API_ENVIRONMENT_OPTION_LIVE;
+
+			$client = EFinancials::factory()
+				->withApiKeyId( $id )
+				->withApiKeyPublic( $public )
+				->withApiKeyPassword( $password )
+				->withBaseUri( $live ? 'https://rmp-api.rik.ee' : 'https://demo-rmp-api.rik.ee' )
+				->make();
+
+			$client->currencies()->all();
+
+			\WC_Admin_Settings::add_message( __( 'e-Financials connection OK.', 'e-financials' ) );
+		} catch ( Throwable $e ) {
+			\WC_Admin_Settings::add_error(
+				\sprintf(
+					/* translators: %s: error */
+					__( 'e-Financials connection failed: %s', 'e-financials' ),
+					$e->getMessage()
+				)
+			);
+		}
+	}
+
+	/**
+	 * Provide arguments.
+	 *
+	 * @param callable(): array<int|string, string> $callback Options loader.
+	 *
+	 * @return array<int|string, string>
+	 */
+	private function safe_id_options( callable $callback ): array {
+
+		$blank = [ '' => __( '— Select —', 'e-financials' ) ];
+
+		try {
+			return $blank + $callback();
+		} catch ( Throwable $e ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found
+			return $blank + [ '' => __( 'Save credentials to load options', 'e-financials' ) ];
+		}
+	}
+
+	/**
+	 * Get value.
+	 *
+	 * @return array<int|string, string>
+	 */
+	private function fetch_invoice_series_options(): array {
+
+		$client  = $this->make_client_from_posted_or_saved();
+		$list    = $client->invoices()->all();
+		$options = [];
+
+		foreach ( $list->data as $series ) {
+			if ( $series->id === null ) {
+				continue;
+			}
+
+			$label                           = \trim( $series->numberPrefix );
+			$extra                           = $series->isDefault ? ' (default)' : '';
+			$options[ (string) $series->id ] = ( $label !== '' ? $label : (string) $series->id ) . $extra;
+		}
+
+		return $options;
+	}
+
+	/**
+	 * Get value.
+	 *
+	 * @return array<int|string, string>
+	 */
+	private function fetch_template_options(): array {
+
+		$client  = $this->make_client_from_posted_or_saved();
+		$list    = $client->templates()->all();
+		$options = [];
+
+		foreach ( $list->data as $template ) {
+			$label                             = $template->name !== '' ? $template->name : (string) $template->id;
+			$options[ (string) $template->id ] = $label . ( $template->isDefault ? ' (default)' : '' );
+		}
+
+		return $options;
+	}
+
+	/**
+	 * Get value.
+	 *
+	 * @return array<int|string, string>
+	 */
+	private function fetch_sale_article_options(): array {
+
+		$client  = $this->make_client_from_posted_or_saved();
+		$list    = $client->salesArticles()->all();
+		$options = [];
+
+		foreach ( $list->data as $article ) {
+			if ( $article->id === null ) {
+				continue;
+			}
+
+			$label                            = $article->nameEng !== '' ? $article->nameEng : $article->nameEst;
+			$options[ (string) $article->id ] = $label !== '' ? $label : (string) $article->id;
+		}
+
+		return $options;
+	}
+
+	/**
+	 * May throw on failure.
+	 *
+	 * @throws \RuntimeException When credentials missing.
+	 */
+	private function make_client_from_posted_or_saved(): \EFinancialsClient\Contracts\ClientContract {
+
+		$id       = (string) $this->get_option( self::SETTING_KEY_API_KEY_ID, '' );
+		$public   = (string) $this->get_option( self::SETTING_KEY_API_KEY_PUBLIC, '' );
+		$password = (string) $this->get_option( self::SETTING_KEY_API_KEY_PASSWORD, '' );
+
+		if ( $id === '' || $public === '' || $password === '' ) {
+			throw new \RuntimeException( 'Missing credentials' );
+		}
+
+		$live = $this->get_option( self::SETTING_KEY_API_ENVIRONMENT )
+			=== self::SETTING_KEY_API_ENVIRONMENT_OPTION_LIVE;
+
+		return EFinancials::factory()
+			->withApiKeyId( $id )
+			->withApiKeyPublic( $public )
+			->withApiKeyPassword( $password )
+			->withBaseUri( $live ? 'https://rmp-api.rik.ee' : 'https://demo-rmp-api.rik.ee' )
+			->make();
 	}
 }
