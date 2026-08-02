@@ -258,6 +258,70 @@ Idempotency: if `_ef_transaction_id` or `_ef_payment_mode=cash` already set, ski
 
 Partial refunds: do **not** use cash fields; create a credit invoice (or negative settlement transaction) for the refunded amount only.
 
+#### Payment transaction plan (gateway-plugin agnostic)
+
+Payment recording **does not depend on any payment-gateway plugin** (Montonio, Maksekeskus, Stripe, Tonic, etc.). The plugin never calls a gateway SDK. It only reads what WooCommerce already stored on the order, then writes cash fields or `transactions` to e-Financials.
+
+**WC inputs always available (core):**
+
+| Order API | Use |
+| --- | --- |
+| `$order->get_payment_method()` | Map key in settings (`bacs`, `cheque`, `cod`, `stripe`, …) |
+| `$order->get_payment_method_title()` | `payment_description` / transaction description |
+| `$order->is_paid()` / `get_date_paid()` | Whether / when to record payment |
+| `$order->get_transaction_id()` | Append to description / ref when present |
+| `$order->get_total()` + `get_currency()` | Transaction amount + `cl_currencies_id` |
+
+Core WooCommerce already provides **BACS, cheque, COD**. Third-party gateways only add more method ids when installed.
+
+```mermaid
+flowchart TD
+	A[Order paid / sync job] --> B{Payment mode for method id}
+	B -->|off| Z[Invoice only — no payment step]
+	B -->|cash| C[Set paid_in_cash + cash_* on sale invoice]
+	C --> D[salesInvoices register]
+	B -->|transaction| E[Create unpaid sale invoice + register]
+	E --> F[transactions create]
+	F --> G[transactions register with distribution to invoice]
+	D --> H[Store _ef_payment_mode / _ef_transaction_id]
+	G --> H
+	Z --> H
+```
+
+**Behaviour without a third-party gateway plugin:**
+
+| Store setup | What happens |
+| --- | --- |
+| Only core methods (BACS / cheque / COD) | Settings map those ids; typical defaults below |
+| Gateway installed later | New method id appears on orders → admin adds a row to the per-gateway map |
+| Gateway uninstalled | Historical orders keep their method id; new orders simply never use it — no hard dependency |
+| Method id not in the map | Use **default payment mode** from settings (`cash` \| `transaction` \| `off`) |
+
+**Suggested defaults for a minimal shop (no card plugins):**
+
+1. Global default: `cash` when `is_paid()` is true (covers COD and most card gateways if added later).
+2. Map `bacs` (and similar bank methods) → `transaction` **or** `off` at invoice create, then record payment when `woocommerce_payment_complete` fires.
+3. Map `cheque` similarly to `bacs`.
+4. Setting `off` = create/register sale invoice only; accountant settles in e-Financials manually.
+
+**Runtime resolution (pseudo):**
+
+```text
+method = order.get_payment_method()
+mode   = settings.gateway_map[method].mode ?? settings.default_payment_mode
+
+if mode == off OR not order.is_paid():
+    skip payment step
+elif mode == cash:
+    Option A (cash fields) using settings.gateway_map[method].cash_accounts_id
+    ?? settings.default_cash_accounts_id
+elif mode == transaction:
+    Option B using settings.gateway_map[method].accounts_dimensions_id
+    ?? settings.default_accounts_dimensions_id
+```
+
+Nothing in `e-financials/php-client` or the OpenAPI talks to payment gateways — only to e-Financials using data already on the WC order.
+
 ### 3.6 Credit on refund — in scope
 
 | WC source | e-Financials | Client API | OpenAPI |
