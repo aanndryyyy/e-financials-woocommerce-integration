@@ -46,13 +46,15 @@ Older WCOM pages still mention Jest/`@woocommerce/e2e-environment`; **do not** r
 
 ### Secrets
 
-For live/demo e-Financials API calls during agent work, store credentials in Cursor Cloud Secrets (never commit):
+For live/demo e-Financials API calls during agent work, store credentials in Cursor Cloud Secrets (never commit). Either naming convention works:
 
-- `EFINANCIALS_API_KEY_ID`
-- `EFINANCIALS_API_KEY_PUBLIC`
-- `EFINANCIALS_API_KEY_PASSWORD`
+- `E_FINANCIALS_API_KEY_ID` or `EFINANCIALS_API_KEY_ID`
+- `E_FINANCIALS_API_KEY_PUBLIC` or `EFINANCIALS_API_KEY_PUBLIC`
+- `E_FINANCIALS_API_KEY_PASSWORD` or `EFINANCIALS_API_KEY_PASSWORD`
 
-Default smoke e2e does not require those secrets.
+Use the **Test Environment** / demo API (`https://demo-rmp-api.rik.ee`). The ApiKey must allow the agent egress IP (or `0.0.0.0/0`) under demo-rmp.rik.ee → Settings → API keys; otherwise live e2e gets HTTP 401 Unauthorized.
+
+Default smoke e2e (`npm run test:e2e`) does not require those secrets. Live demo coverage: `npm run test:e2e:live`.
 
 ### Verification
 

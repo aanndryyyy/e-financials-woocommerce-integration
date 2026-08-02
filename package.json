@@ -12,9 +12,10 @@
     "stop": "wp-env stop",
     "destroy": "wp-env destroy",
     "import:demo": "wp-env run cli wp import wp-content/plugins/woocommerce/sample-data/sample_products.xml --authors=create",
-    "test:e2e": "playwright test --config=tests/e2e/playwright.config.js",
-    "test:e2e:headed": "playwright test --config=tests/e2e/playwright.config.js --headed",
+    "test:e2e": "playwright test --config=tests/e2e/playwright.config.js --grep-invert @live",
+    "test:e2e:headed": "playwright test --config=tests/e2e/playwright.config.js --headed --grep-invert @live",
     "test:e2e:ui": "playwright test --config=tests/e2e/playwright.config.js --ui",
+    "test:e2e:live": "playwright test --config=tests/e2e/playwright.config.js --grep @live",
     "test:e2e:install": "playwright install --with-deps chromium"
   }
 }
