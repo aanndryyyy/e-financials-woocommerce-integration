@@ -28,7 +28,7 @@ class Autowiring {
 	/**
 	 * Array of psr-4 prefixes. Should be provided by Composer's ClassLoader. $ClassLoader->getPsr4Prefixes().
 	 *
-	 * @var array<string, string>
+	 * @var array<string, string[]>
 	 */
 	protected $psr4_prefixes;
 
@@ -94,9 +94,7 @@ class Autowiring {
 		// they were initially irrelevant.
 		foreach ( $dependency_tree as &$dependencies ) {
 
-			// PHPCS:Ignore Generic.Commenting.DocComment.MissingShort
-			/** @var array<string, array<string, string>> $dependencies */
-			foreach ( $dependencies as $dep_class => $sub_deps ) {
+			foreach ( \array_keys( $dependencies ) as $dep_class ) {
 
 				// No need to build dependencies for this again if we already have them.
 				if ( isset( $dependency_tree[ $dep_class ] ) ) {
@@ -172,7 +170,10 @@ class Autowiring {
 			// to check if this parameter has a default value or not (so we need to throw an exception regardless).
 			// See: https://www.php.net/manual/en/class.reflectionnamedtype.php.
 			if ( $is_builtin && ! isset( $ignore_paths[ $refl_param->getName() ] ) ) {
-				throw InvalidAutowireDependency::throw_primitive_dependency_found( $relevant_class, $refl_param->getName() );
+				throw InvalidAutowireDependency::throw_primitive_dependency_found(
+					\esc_html( $relevant_class ),
+					\esc_html( $refl_param->getName() )
+				);
 			}
 
 			// Keeping PHPStan happy.
@@ -210,8 +211,8 @@ class Autowiring {
 	/**
 	 * Returns all classes in namespace.
 	 *
-	 * @param string                $namespace_name Name of namespace.
-	 * @param array<string, string> $psr4_prefixes Array of psr-4 compliant namespaces and their accompanying folders.
+	 * @param string                  $namespace_name Name of namespace.
+	 * @param array<string, string[]> $psr4_prefixes Array of psr-4 compliant namespaces and their accompanying folders.
 	 *
 	 * @return string[]
 	 */
@@ -295,7 +296,10 @@ class Autowiring {
 		$class_name = \ucfirst( $filename );
 
 		if ( ! isset( $filename_index[ $filename ] ) ) {
-			throw InvalidAutowireDependency::throw_unable_to_find_class( $class_name, $interface_name );
+			throw InvalidAutowireDependency::throw_unable_to_find_class(
+				\esc_html( $class_name ),
+				\esc_html( $interface_name )
+			);
 		}
 
 		// Let's go through each file that's called $filename and check which interfaces that class
@@ -306,7 +310,10 @@ class Autowiring {
 		foreach ( $filename_index[ $filename ] as $class_in_filename ) {
 
 			if ( ! isset( $class_interface_index[ $class_in_filename ] ) ) {
-				throw InvalidAutowireDependency::throw_unable_to_find_class( $class_in_filename, 'classInterfaceIndex' );
+				throw InvalidAutowireDependency::throw_unable_to_find_class(
+					\esc_html( $class_in_filename ),
+					\esc_html( 'classInterfaceIndex' )
+				);
 			}
 
 			// If the current class implements the interface we're looking for, great!
@@ -321,11 +328,17 @@ class Autowiring {
 		// (i.e. if 2 classes of the same name are implementing the interface we're looking for)
 		// then we need to cancel the match because we don't know how to handle that.
 		if ( $matches === 0 ) {
-			throw InvalidAutowireDependency::throw_unable_to_find_class( $class_name, $interface_name );
+			throw InvalidAutowireDependency::throw_unable_to_find_class(
+				\esc_html( $class_name ),
+				\esc_html( $interface_name )
+			);
 		}
 
 		if ( $matches > 1 ) {
-			throw InvalidAutowireDependency::throw_more_than_one_class_found( $class_name, $interface_name );
+			throw InvalidAutowireDependency::throw_more_than_one_class_found(
+				\esc_html( $class_name ),
+				\esc_html( $interface_name )
+			);
 		}
 
 		return $match;
@@ -342,7 +355,7 @@ class Autowiring {
 
 		$filename_index = [];
 
-		foreach ( $reflection_classes as $relevant_class => $refl_class ) {
+		foreach ( \array_keys( $reflection_classes ) as $relevant_class ) {
 
 			$filename = $this->get_filename_from_class( $relevant_class );
 
@@ -355,8 +368,6 @@ class Autowiring {
 	/**
 	 * Builds the PSR-4 class => [$interfaces] index. Map classes to interface they implement.
 	 *
-	 * @psalm-suppress TooManyArguments
-	 *
 	 * @param array<string, ReflectionClass<object>> $reflection_classes  Reflection classes of all relevant classes.
 	 *
 	 * @return array<string, array<string, true>>
@@ -367,12 +378,10 @@ class Autowiring {
 
 		foreach ( $reflection_classes as $project_class => $reflection_class ) {
 
-			$interfaces = \array_map(
-				fn () => true,
-				$reflection_class->getInterfaces()
+			$class_interface_index[ $project_class ] = \array_fill_keys(
+				\array_keys( $reflection_class->getInterfaces() ),
+				true
 			);
-
-			$class_interface_index[ $project_class ] = $interfaces;
 		}
 
 		return $class_interface_index;
@@ -423,8 +432,8 @@ class Autowiring {
 	 * Validates that all classes/interfaces/traits/etc. provided here are valid (we can build a ReflectionClass
 	 * on them) and return them. Otherwise, throw an exception.
 	 *
-	 * @param array<string, mixed> $class_names FQCNs found in $this->namespace.
-	 * @param bool                 $skip_invalid Skip invalid namespaces rather than throwing an exception. Used for tests.
+	 * @param string[] $class_names FQCNs found in $this->namespace.
+	 * @param bool     $skip_invalid Skip invalid namespaces rather than throwing an exception. Used for tests.
 	 *
 	 * @return array<string, ReflectionClass<object>>
 	 *
@@ -436,17 +445,13 @@ class Autowiring {
 
 		foreach ( $class_names as $class_name ) {
 
-			if ( ! is_string( $class_name ) ) {
-				continue;
-			}
-
 			// Validate as class-string.
 			if ( ! class_exists( $class_name ) && ! interface_exists( $class_name ) ) {
 				if ( $skip_invalid ) {
 					continue;
 				}
 
-				throw NonPsr4CompliantClass::throw_invalid_namespace( $class_name );
+				throw NonPsr4CompliantClass::throw_invalid_namespace( \esc_html( $class_name ) );
 			}
 
 			$refl_class = new ReflectionClass( $class_name );
@@ -460,16 +465,18 @@ class Autowiring {
 	/**
 	 * Filters out manually defined dependencies so we don't autowire them.
 	 *
-	 * @param array<string, mixed> $service_classes All FQCNs inside the namespace.
+	 * @param string[]             $service_classes All FQCNs inside the namespace.
 	 * @param array<string, mixed> $manually_defined_dependencies Manually defined dependency tree.
 	 *
-	 * @return array<string, mixed>
+	 * @return string[]
 	 */
 	private function filter_manually_defined_dependencies( array $service_classes, array $manually_defined_dependencies ): array {
 
-		return \array_filter(
-			$service_classes,
-			fn ( $class_namespace ) => ! isset( $manually_defined_dependencies[ $class_namespace ] ),
+		return \array_values(
+			\array_filter(
+				$service_classes,
+				static fn ( string $class_namespace ): bool => ! isset( $manually_defined_dependencies[ $class_namespace ] ),
+			)
 		);
 	}
 }
