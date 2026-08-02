@@ -70,12 +70,12 @@ abstract class AbstractMain extends Autowiring implements ServiceInterface {
 			$this->services,
 			function ( object $the_service_class ) {
 
-				// Load services classes but not in the WP-CLI env.
-				if ( ! \defined( 'WP_CLI' ) && $the_service_class instanceof ServiceInterface ) {
+				// Always register web/hook services — Action Scheduler often runs via WP-CLI.
+				if ( $the_service_class instanceof ServiceInterface ) {
 					$the_service_class->register();
 				}
 
-				// Load services CLI classes only in WP-CLI env.
+				// Load CLI-only services exclusively in the WP-CLI env.
 				if ( \defined( 'WP_CLI' ) && $the_service_class instanceof ServiceCliInterface ) {
 					$the_service_class->register();
 				}

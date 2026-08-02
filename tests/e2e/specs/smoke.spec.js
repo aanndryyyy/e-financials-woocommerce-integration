@@ -1,5 +1,9 @@
 const { test, expect } = require( '@playwright/test' );
-const { loginAsAdmin, openEFinancialsSettings } = require( '../utils/backend' );
+const {
+	loginAsAdmin,
+	openEFinancialsSettings,
+	expectSettingsSaved,
+} = require( '../utils/backend' );
 const { openShop } = require( '../utils/frontend' );
 
 /**
@@ -21,13 +25,18 @@ test.describe( 'e-Financials smoke', () => {
 	test( 'merchant can save test environment setting', async ( { page } ) => {
 		await openEFinancialsSettings( page );
 
+		// Clear dummy credentials so the connection ping does not fire.
+		await page.locator( '#woocommerce_efinancials_integration_api_key_id' ).fill( '' );
+		await page.locator( '#woocommerce_efinancials_integration_api_key_public' ).fill( '' );
+		await page.locator( '#woocommerce_efinancials_integration_api_key_password' ).fill( '' );
+
 		const environment = page.locator(
 			'#woocommerce_efinancials_integration_api_key_environment'
 		);
 		await environment.selectOption( 'api_environment_test' );
 		await page.getByRole( 'button', { name: 'Save changes' } ).click();
 
-		await expect( page.getByText( 'Your settings have been saved' ) ).toBeVisible();
+		await expectSettingsSaved( page );
 		await expect( environment ).toHaveValue( 'api_environment_test' );
 	} );
 

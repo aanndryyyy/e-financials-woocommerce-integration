@@ -36,9 +36,34 @@ async function openEFinancialsSettings( page ) {
 	);
 }
 
+/**
+ * Assert settings form saved (success and/or connection ping notice).
+ *
+ * @param {import('@playwright/test').Page} page
+ */
+async function expectSettingsSaved( page ) {
+	await expectNotice(
+		page,
+		/Your settings have been saved|e-Financials connection (OK|failed)/i
+	);
+}
+
+/**
+ * @param {import('@playwright/test').Page} page
+ * @param {RegExp|string} text
+ */
+async function expectNotice( page, text ) {
+	const { expect } = require( '@playwright/test' );
+	await expect( page.locator( '#message, .updated, .error, .notice' ).filter( { hasText: text } ).first() ).toBeVisible( {
+		timeout: 20_000,
+	} );
+}
+
 module.exports = {
 	loginAsAdmin,
 	openEFinancialsSettings,
+	expectSettingsSaved,
+	expectNotice,
 	ADMIN_USER,
 	ADMIN_PASSWORD,
 };

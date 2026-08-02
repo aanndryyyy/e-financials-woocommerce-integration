@@ -249,7 +249,8 @@ class EFinancialsIntegration extends \WC_Integration {
 
 			\WC_Admin_Settings::add_message( __( 'e-Financials connection OK.', 'e-financials' ) );
 		} catch ( Throwable $e ) {
-			\WC_Admin_Settings::add_error(
+			// Keep this as a message (not add_error) so the settings-saved notice still shows.
+			\WC_Admin_Settings::add_message(
 				\sprintf(
 					/* translators: %s: error */
 					__( 'e-Financials connection failed: %s', 'e-financials' ),
