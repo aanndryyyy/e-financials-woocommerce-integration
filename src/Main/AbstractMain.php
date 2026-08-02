@@ -41,8 +41,8 @@ abstract class AbstractMain extends Autowiring implements ServiceInterface {
 	/**
 	 * Constructs object and inserts prefixes from composer.
 	 *
-	 * @param array<string, string> $psr4_prefixes Composer's ClassLoader psr4Prefixes. $ClassLoader->getPsr4Prefixes().
-	 * @param string                $project_namespace Projects namespace.
+	 * @param array<string, string[]> $psr4_prefixes Composer's ClassLoader psr4Prefixes. $ClassLoader->getPsr4Prefixes().
+	 * @param string                  $project_namespace Projects namespace.
 	 */
 	public function __construct( array $psr4_prefixes, string $project_namespace ) {
 
@@ -125,7 +125,7 @@ abstract class AbstractMain extends Autowiring implements ServiceInterface {
 		$container = $this->get_di_container( $services );
 
 		return \array_map(
-			fn ( int|string $the_class ): object => (object) $container->get( (string) $the_class ),
+			static fn ( string $the_class ): object => (object) $container->get( $the_class ),
 			\array_keys( $services )
 		);
 	}
@@ -136,7 +136,7 @@ abstract class AbstractMain extends Autowiring implements ServiceInterface {
 	 *
 	 * @throws Exception Exception thrown in case class is missing.
 	 *
-	 * @return array<int|string, array<string>>
+	 * @return array<string, string[]>
 	 */
 	private function get_service_classes_prepared_array(): array {
 
@@ -146,7 +146,13 @@ abstract class AbstractMain extends Autowiring implements ServiceInterface {
 		foreach ( $classes as $class => $dependencies ) {
 
 			if ( \is_array( $dependencies ) ) {
-				$output[ (string) $class ] = $dependencies;
+				$output[ (string) $class ] = \array_values(
+					\array_filter( $dependencies, 'is_string' )
+				);
+				continue;
+			}
+
+			if ( ! \is_string( $dependencies ) ) {
 				continue;
 			}
 
@@ -163,7 +169,7 @@ abstract class AbstractMain extends Autowiring implements ServiceInterface {
 	 * Wire all the dependencies automatically, based on the provided array of
 	 * class => dependencies from the get_di_items().
 	 *
-	 * @param array<int|string, array<string>> $services Array of service.
+	 * @param array<string, string[]> $services Array of service.
 	 *
 	 * @throws Exception Exception thrown by the DI container.
 	 *
@@ -195,22 +201,24 @@ abstract class AbstractMain extends Autowiring implements ServiceInterface {
 	 * Return prepared Dependency Injection objects.
 	 * If you pass a class use PHP-DI to prepare if not just output it.
 	 *
-	 * @param array<string, string> $dependencies Array of classes/parameters to push in constructor.
+	 * @param string[] $dependencies Array of classes/parameters to push in constructor.
 	 *
-	 * @return array<string, mixed>
+	 * @return array<int, Reference|string>
 	 */
 	private function get_di_dependencies( array $dependencies ): array {
 
-		return \array_map(
-			function ( $dependency ) {
+		return \array_values(
+			\array_map(
+				static function ( string $dependency ): Reference|string {
 
-				if ( \class_exists( $dependency ) ) {
-					return new Reference( $dependency );
-				}
+					if ( \class_exists( $dependency ) ) {
+						return new Reference( $dependency );
+					}
 
-				return $dependency;
-			},
-			$dependencies
+					return $dependency;
+				},
+				$dependencies
+			)
 		);
 	}
 
