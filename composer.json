@@ -15,6 +15,9 @@
         }
     ],
     "require": {
+        "php": "^8.2",
+        "e-financials/php-client": "dev-main",
+        "guzzlehttp/guzzle": "^7.5",
         "php-di/invoker": "^2.3",
         "php-di/php-di": "^7.0"
     },
@@ -23,11 +26,19 @@
         "squizlabs/php_codesniffer": "*",
         "wp-coding-standards/wpcs": "dev-develop"
     },
+    "repositories": [
+        {
+            "type": "vcs",
+            "url": "https://github.com/aanndryyyy/e-financials-php-client.git"
+        }
+    ],
     "config": {
         "allow-plugins": {
             "bamarni/composer-bin-plugin": true,
-            "dealerdirect/phpcodesniffer-composer-installer": true
-        }
+            "dealerdirect/phpcodesniffer-composer-installer": true,
+            "php-http/discovery": true
+        },
+        "sort-packages": true
     },
     "extra": {
         "bamarni-bin": {

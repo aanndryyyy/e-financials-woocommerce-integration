@@ -1,4 +1,10 @@
-# TODO
+# e-Financials WooCommerce integration
+
+WooCommerce → [e-Arveldaja / e-Financials](https://e-arveldaja.rik.ee/) bookkeeping sync.
+
+**Workflow map** (Accountants.Contact + Merit Aktiva hooks → OpenAPI → `e-financials/php-client`): see [`docs/accounting-workflow.md`](docs/accounting-workflow.md).
+
+API traffic goes through [`e-financials/php-client`](https://github.com/aanndryyyy/e-financials-php-client) (`composer require e-financials/php-client` once published on Packagist; until then Composer uses the GitHub VCS repository).
 
 ## Sequences
 Main goal of the integration is to be invisible for the end user. This means, that everything is set up so that the reponses to client are immidiate. Processing and sending data to e-Financials will happen in the background.
