@@ -5,3 +5,9 @@
 /vendor-bin/**/vendor/
 /vendor-bin/**/composer.lock
 *.log
+/test-results/
+/playwright-report/
+/blob-report/
+/tests/e2e/test-results/
+/tests/e2e/playwright-report/
+/tests/e2e/.auth/
