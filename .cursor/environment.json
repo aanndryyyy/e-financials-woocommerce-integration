@@ -1,0 +1,20 @@
+{
+  "name": "e-financials-woocommerce",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "install": "(npm ci || npm install) && composer install --no-interaction --prefer-dist && npx playwright install --with-deps chromium",
+  "start": "sudo service docker start",
+  "terminals": [
+    {
+      "name": "wp-env",
+      "command": "npm start",
+      "description": "Starts WordPress + WooCommerce via wp-env (Docker). Site: http://localhost:8888 (admin/password). Wait until wp-env reports ready before running e2e."
+    }
+  ],
+  "ports": [
+    { "name": "WordPress", "port": 8888 },
+    { "name": "WordPress tests", "port": 8889 }
+  ],
+  "user": "ubuntu"
+}
