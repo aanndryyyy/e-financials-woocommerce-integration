@@ -100,7 +100,7 @@ class SaleInvoiceService {
 
 		if ( ! $response->successful() || $response->createdObjectId === null ) {
 			throw new RuntimeException(
-				'Failed to create sale invoice: ' . \implode( '; ', $response->messages )
+				\esc_html( 'Failed to create sale invoice: ' . \implode( '; ', $response->messages ) )
 			);
 		}
 
@@ -109,7 +109,7 @@ class SaleInvoiceService {
 
 		if ( ! $register->successful() ) {
 			throw new RuntimeException(
-				'Failed to register sale invoice #' . $invoice_id . ': ' . \implode( '; ', $register->messages )
+				\esc_html( 'Failed to register sale invoice #' . $invoice_id . ': ' . \implode( '; ', $register->messages ) )
 			);
 		}
 

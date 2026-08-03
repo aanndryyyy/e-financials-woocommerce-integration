@@ -101,7 +101,7 @@ class DeliveryService {
 
 		if ( ! $response->successful() ) {
 			throw new RuntimeException(
-				'Failed to deliver sale invoice: ' . \implode( '; ', $response->messages )
+				\esc_html( 'Failed to deliver sale invoice: ' . \implode( '; ', $response->messages ) )
 			);
 		}
 

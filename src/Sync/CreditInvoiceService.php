@@ -117,7 +117,7 @@ class CreditInvoiceService {
 
 		if ( ! $response->successful() || $response->createdObjectId === null ) {
 			throw new RuntimeException(
-				'Failed to create credit sale invoice: ' . \implode( '; ', $response->messages )
+				\esc_html( 'Failed to create credit sale invoice: ' . \implode( '; ', $response->messages ) )
 			);
 		}
 
@@ -126,7 +126,7 @@ class CreditInvoiceService {
 
 		if ( ! $register->successful() ) {
 			throw new RuntimeException(
-				'Failed to register credit sale invoice #' . $credit_id . ': ' . \implode( '; ', $register->messages )
+				\esc_html( 'Failed to register credit sale invoice #' . $credit_id . ': ' . \implode( '; ', $register->messages ) )
 			);
 		}
 

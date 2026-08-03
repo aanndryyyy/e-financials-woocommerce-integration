@@ -37,10 +37,12 @@ final class TaxRates {
 		if ( $rate_ids === [] ) {
 			if ( $tax > 0.0 ) {
 				throw new RuntimeException(
-					\sprintf(
-						/* translators: %s: line item name */
-						__( 'Cannot resolve the VAT rate for line "%s": it carries tax but no WooCommerce tax rate.', 'e-financials' ),
-						$item->get_name()
+					\esc_html(
+						\sprintf(
+							/* translators: %s: line item name */
+							__( 'Cannot resolve the VAT rate for line "%s": it carries tax but no WooCommerce tax rate.', 'e-financials' ),
+							$item->get_name()
+						)
 					)
 				);
 			}
@@ -148,11 +150,13 @@ final class TaxRates {
 
 			if ( ! \is_array( $rate ) || ! isset( $rate['tax_rate'] ) || ! \is_numeric( $rate['tax_rate'] ) ) {
 				throw new RuntimeException(
-					\sprintf(
-						/* translators: 1: tax rate id, 2: line item name */
-						__( 'WooCommerce tax rate #%1$d used by "%2$s" no longer exists; refusing to guess the VAT rate.', 'e-financials' ),
-						$rate_id,
-						$context
+					\esc_html(
+						\sprintf(
+							/* translators: 1: tax rate id, 2: line item name */
+							__( 'WooCommerce tax rate #%1$d used by "%2$s" no longer exists; refusing to guess the VAT rate.', 'e-financials' ),
+							$rate_id,
+							$context
+						)
 					)
 				);
 			}

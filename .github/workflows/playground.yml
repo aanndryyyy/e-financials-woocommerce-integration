@@ -19,7 +19,9 @@ permissions:
   pull-requests: write
 
 env:
-  PLUGIN_SLUG: e-financials-woocommerce-integration
+  # Must match the plugin's Text Domain — Plugin Check derives the slug from
+  # the installed directory name.
+  PLUGIN_SLUG: e-financials
   BUILDS_BRANCH: playground-builds
 
 jobs:
@@ -61,8 +63,13 @@ jobs:
           /node_modules/
           /tests/
           /vendor-bin/
+          /.editorconfig
           /.env
+          /.gitignore
+          /.phpunit.result.cache
           /.wp-env.json
+          /AGENTS.md
+          /README.md
           /package.json
           /package-lock.json
           /phpcs.xml.dist

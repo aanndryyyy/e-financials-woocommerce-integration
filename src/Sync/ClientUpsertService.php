@@ -79,7 +79,7 @@ class ClientUpsertService {
 
 			if ( ! $response->successful() ) {
 				throw new RuntimeException(
-					'Failed to update e-Financials client: ' . \implode( '; ', $response->messages )
+					\esc_html( 'Failed to update e-Financials client: ' . \implode( '; ', $response->messages ) )
 				);
 			}
 		} else {
@@ -87,7 +87,7 @@ class ClientUpsertService {
 
 			if ( ! $response->successful() || $response->createdObjectId === null ) {
 				throw new RuntimeException(
-					'Failed to create e-Financials client: ' . \implode( '; ', $response->messages )
+					\esc_html( 'Failed to create e-Financials client: ' . \implode( '; ', $response->messages ) )
 				);
 			}
 

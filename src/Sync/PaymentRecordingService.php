@@ -179,7 +179,7 @@ class PaymentRecordingService {
 
 		if ( ! $response->successful() || $response->createdObjectId === null ) {
 			throw new RuntimeException(
-				'Failed to create payment transaction: ' . \implode( '; ', $response->messages )
+				\esc_html( 'Failed to create payment transaction: ' . \implode( '; ', $response->messages ) )
 			);
 		}
 
@@ -198,7 +198,7 @@ class PaymentRecordingService {
 
 		if ( ! $register->successful() ) {
 			throw new RuntimeException(
-				'Failed to register payment transaction #' . $tx_id . ': ' . \implode( '; ', $register->messages )
+				\esc_html( 'Failed to register payment transaction #' . $tx_id . ': ' . \implode( '; ', $register->messages ) )
 			);
 		}
 

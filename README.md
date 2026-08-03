@@ -1,4 +1,4 @@
-# e-Financials WooCommerce integration
+# e-Financials for WooCommerce
 
 WooCommerce → [e-Arveldaja / e-Financials](https://e-arveldaja.rik.ee/) bookkeeping sync.
 
