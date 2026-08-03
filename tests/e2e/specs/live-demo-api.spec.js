@@ -6,7 +6,9 @@ const {
 const {
 	hasDemoCredentials,
 	probeDemoApiFromHost,
+	pickSyncableArticle,
 	configurePluginSettings,
+	setStoreCurrency,
 	createPaidOrder,
 	syncOrderNow,
 	getOrderSyncMeta,
@@ -89,13 +91,22 @@ test.describe( 'e-Financials live demo API @live', () => {
 		const templateId = probe.templates?.[ 0 ]?.id;
 		test.skip( ! templateId, 'Demo tenant has no invoice templates' );
 
+		// Not articles[0]: that is whatever the API listed first, often an article
+		// posting to a dimensioned account, which e-Financials refuses.
+		const article = pickSyncableArticle( probe.articles );
+		test.skip(
+			! article,
+			'Demo tenant has no sale article that is valid, free of account dimensions, and pins no VAT rate'
+		);
+
 		configurePluginSettings( {
 			templateId,
 			seriesId: probe.series?.[ 0 ]?.id,
-			articleId: probe.articles?.[ 0 ]?.id,
+			articleId: article.id,
 			// Avoid cash/transaction account IDs until discovered from tenant.
 			paymentMode: 'off',
 		} );
+		setStoreCurrency( 'EUR' );
 
 		const orderId = createPaidOrder();
 		expect( orderId ).toBeGreaterThan( 0 );
@@ -103,7 +114,9 @@ test.describe( 'e-Financials live demo API @live', () => {
 		const result = syncOrderNow( orderId );
 		if ( ! result.ok ) {
 			throw new Error(
-				`Order ${ orderId } sync failed: ${ result.error || result.lastError || 'unknown' }`
+				`Order ${ orderId } sync failed using sale article #${ article.id } ` +
+					`(${ article.name }, account ${ article.accountsId }, VAT ${ article.vatRate }): ` +
+					`${ result.error || result.lastError || 'unknown' }`
 			);
 		}
 
