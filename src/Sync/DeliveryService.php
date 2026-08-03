@@ -82,7 +82,7 @@ class DeliveryService {
 				'E-invoice delivery not available for invoice.',
 				[
 					'invoice_id' => $invoice_id,
-					'reason'     => (string) ( $options->canSendEinvoiceReason ?? '' ),
+					'reason'     => $options->canSendEinvoiceReason ?? '',
 				]
 			);
 		}

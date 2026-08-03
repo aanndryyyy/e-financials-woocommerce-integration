@@ -104,7 +104,7 @@ class SaleInvoiceService {
 			);
 		}
 
-		$invoice_id = (int) $response->createdObjectId;
+		$invoice_id = $response->createdObjectId;
 		$register   = $client->salesInvoices()->register( $invoice_id );
 
 		if ( ! $register->successful() ) {

@@ -141,6 +141,22 @@ class OrderMetabox implements ServiceInterface {
 	}
 
 	/**
+	 * Bail out with a 404.
+	 *
+	 * Split out so both analysers see the missing-order branch as terminating:
+	 * the WordPress stub types wp_die() as `never|void`, which Psalm resolves to
+	 * a possible return.
+	 *
+	 * @return never
+	 *
+	 * @psalm-suppress InvalidReturnType -- wp_die() always exits here; only its stub is imprecise.
+	 */
+	private function die_not_found(): void {
+
+		\wp_die( \esc_html__( 'Order not found.', 'e-financials' ), 404 );
+	}
+
+	/**
 	 * Stream system PDF to the browser.
 	 */
 	public function ajax_download_pdf(): void {
@@ -156,7 +172,7 @@ class OrderMetabox implements ServiceInterface {
 		$order        = \wc_get_order( $order_id );
 
 		if ( ! $order instanceof WC_Order ) {
-			\wp_die( \esc_html__( 'Order not found.', 'e-financials' ), 404 );
+			$this->die_not_found();
 		}
 
 		$invoice_id = OrderMeta::get_int( $order, OrderMetaKeys::SALE_INVOICE_ID );

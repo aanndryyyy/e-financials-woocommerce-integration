@@ -341,7 +341,7 @@ class ProductEnsureService {
 		if ( $response->successful() && $response->createdObjectId !== null ) {
 			$this->lookup->flush();
 
-			return (int) $response->createdObjectId;
+			return $response->createdObjectId;
 		}
 
 		// A create can lose a race, or the code can pre-date this site: re-scan before failing.

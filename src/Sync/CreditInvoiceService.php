@@ -121,7 +121,7 @@ class CreditInvoiceService {
 			);
 		}
 
-		$credit_id = (int) $response->createdObjectId;
+		$credit_id = $response->createdObjectId;
 		$register  = $client->salesInvoices()->register( $credit_id );
 
 		if ( ! $register->successful() ) {

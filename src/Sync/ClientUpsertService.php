@@ -91,7 +91,7 @@ class ClientUpsertService {
 				);
 			}
 
-			$clients_id = (int) $response->createdObjectId;
+			$clients_id = $response->createdObjectId;
 			$this->lookup->flush();
 		}
 

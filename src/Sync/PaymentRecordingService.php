@@ -183,7 +183,7 @@ class PaymentRecordingService {
 			);
 		}
 
-		$tx_id = (int) $response->createdObjectId;
+		$tx_id = $response->createdObjectId;
 
 		$register = $client->transactions()->register(
 			$tx_id,

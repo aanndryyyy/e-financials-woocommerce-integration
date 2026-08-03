@@ -62,10 +62,13 @@ class Logger {
 			return;
 		}
 
+		$encoded = $context !== [] ? \wp_json_encode( $context ) : false;
+		$suffix  = \is_string( $encoded ) ? ' ' . $encoded : '';
+
 		$logger = \wc_get_logger();
 		$logger->log(
 			$level,
-			$message . ( $context !== [] ? ' ' . \wp_json_encode( $context ) : '' ),
+			$message . $suffix,
 			[ 'source' => self::SOURCE ]
 		);
 	}
