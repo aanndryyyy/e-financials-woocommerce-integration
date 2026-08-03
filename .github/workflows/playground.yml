@@ -136,9 +136,13 @@ jobs:
                 : plugin
             );
 
+            // encodeURIComponent leaves parentheses alone, and the blueprint's PHP
+            // is full of them — unencoded, they cut the markdown link short.
             const url =
               'https://playground.wordpress.net/#' +
-              encodeURIComponent( JSON.stringify( blueprint ) );
+              encodeURIComponent( JSON.stringify( blueprint ) )
+                .replace( /\(/g, '%28' )
+                .replace( /\)/g, '%29' );
 
             const marker = '<!-- playground-preview -->';
             const body = [
