@@ -34,29 +34,47 @@ final class RetryState {
 	public const MAX_ATTEMPTS = 8;
 
 	/**
-	 * Whether the order may be attempted right now.
+	 * Default scope: the order sync pipeline.
+	 */
+	public const SCOPE_SYNC = '';
+
+	/**
+	 * Scope for a refund's credit invoice job.
+	 *
+	 * Credit invoices fail independently of the order sync, so they must not
+	 * consume the sync's attempts or delay its retries.
+	 *
+	 * @param int $refund_id Refund ID.
+	 */
+	public static function scope_refund( int $refund_id ): string {
+
+		return '_refund_' . $refund_id;
+	}
+
+	/**
+	 * Whether the subject may be attempted right now.
 	 *
 	 * @param WC_Order $order Order.
+	 * @param string   $scope Retry scope.
 	 */
-	public static function is_due( WC_Order $order ): bool {
+	public static function is_due( WC_Order $order, string $scope = self::SCOPE_SYNC ): bool {
 
-		if ( self::attempts( $order ) >= self::MAX_ATTEMPTS ) {
+		if ( self::attempts( $order, $scope ) >= self::MAX_ATTEMPTS ) {
 			return false;
 		}
 
-		$next = OrderMeta::get_int( $order, OrderMetaKeys::NEXT_ATTEMPT_AT );
-
-		return $next <= \time();
+		return OrderMeta::get_int( $order, OrderMetaKeys::NEXT_ATTEMPT_AT . $scope ) <= \time();
 	}
 
 	/**
 	 * Current failure count.
 	 *
 	 * @param WC_Order $order Order.
+	 * @param string   $scope Retry scope.
 	 */
-	public static function attempts( WC_Order $order ): int {
+	public static function attempts( WC_Order $order, string $scope = self::SCOPE_SYNC ): int {
 
-		return OrderMeta::get_int( $order, OrderMetaKeys::ATTEMPTS );
+		return OrderMeta::get_int( $order, OrderMetaKeys::ATTEMPTS . $scope );
 	}
 
 	/**
@@ -64,16 +82,20 @@ final class RetryState {
 	 *
 	 * @param WC_Order $order   Order.
 	 * @param string   $message Sanitised failure message.
+	 * @param string   $scope   Retry scope.
 	 *
 	 * @return bool True when the merchant should be notified (first failure or a new message).
 	 */
-	public static function record_failure( WC_Order $order, string $message ): bool {
+	public static function record_failure( WC_Order $order, string $message, string $scope = self::SCOPE_SYNC ): bool {
 
-		$attempts = self::attempts( $order ) + 1;
-		$previous = OrderMeta::get_string( $order, OrderMetaKeys::LAST_ERROR );
+		$attempts = self::attempts( $order, $scope ) + 1;
+		$previous = OrderMeta::get_string( $order, OrderMetaKeys::LAST_ERROR . $scope );
 
-		OrderMeta::set( $order, OrderMetaKeys::ATTEMPTS, $attempts );
-		OrderMeta::set( $order, OrderMetaKeys::NEXT_ATTEMPT_AT, \time() + self::delay( $attempts ) );
+		OrderMeta::set( $order, OrderMetaKeys::ATTEMPTS . $scope, $attempts );
+		OrderMeta::set( $order, OrderMetaKeys::NEXT_ATTEMPT_AT . $scope, \time() + self::delay( $attempts ) );
+		OrderMeta::set( $order, OrderMetaKeys::LAST_ERROR . $scope, $message );
+
+		// The metabox and order column always read the unscoped key.
 		OrderMeta::set( $order, OrderMetaKeys::LAST_ERROR, $message );
 
 		return $previous !== $message;
@@ -83,11 +105,13 @@ final class RetryState {
 	 * Clear retry state after a successful run.
 	 *
 	 * @param WC_Order $order Order.
+	 * @param string   $scope Retry scope.
 	 */
-	public static function clear( WC_Order $order ): void {
+	public static function clear( WC_Order $order, string $scope = self::SCOPE_SYNC ): void {
 
-		$order->delete_meta_data( OrderMetaKeys::ATTEMPTS );
-		$order->delete_meta_data( OrderMetaKeys::NEXT_ATTEMPT_AT );
+		$order->delete_meta_data( OrderMetaKeys::ATTEMPTS . $scope );
+		$order->delete_meta_data( OrderMetaKeys::NEXT_ATTEMPT_AT . $scope );
+		$order->delete_meta_data( OrderMetaKeys::LAST_ERROR . $scope );
 		$order->delete_meta_data( OrderMetaKeys::LAST_ERROR );
 	}
 

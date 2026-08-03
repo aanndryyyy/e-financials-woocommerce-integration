@@ -86,6 +86,21 @@ final class SaleArticleMapTest extends TestCase {
 	}
 
 	/**
+	 * Zero-rated lines (including tax-free shops) can be mapped explicitly.
+	 */
+	public function test_zero_rate_can_be_mapped(): void {
+
+		$settings = $this->withSettings(
+			[
+				'cl_sale_articles_id'  => 1,
+				'cl_sale_articles_map' => '{"0":12}',
+			]
+		);
+
+		$this->assertSame( 12, $settings->sale_article_for_rate( 0.0 ) );
+	}
+
+	/**
 	 * Malformed JSON degrades to the default article rather than exploding.
 	 */
 	public function test_broken_json_is_ignored(): void {

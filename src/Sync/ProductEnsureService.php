@@ -235,7 +235,7 @@ class ProductEnsureService {
 			throw new RuntimeException(
 				\sprintf(
 					/* translators: 1: sale article id, 2: article VAT percentage, 3: order line VAT percentage */
-					__( 'Sale article #%1$d is VAT %2$s%% but the order line is VAT %3$s%%. Map this rate to a matching sale article; e-Financials books VAT by article.', 'e-financials' ),
+					__( 'Sale article #%1$d is VAT %2$s%% but the order line is VAT %3$s%%. Add "%3$s" to the VAT rate → sale article map; e-Financials books VAT by article, so the rates must match. Shops with WooCommerce taxes disabled need a "0" entry.', 'e-financials' ),
 					$sale_article,
 					(string) $article_rate,
 					(string) $vat_rate

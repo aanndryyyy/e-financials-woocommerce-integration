@@ -114,18 +114,21 @@ class RegisterJobs implements ServiceInterface {
 			return;
 		}
 
-		$lock = 'refund-' . (int) $refund_id;
+		$lock  = 'refund-' . (int) $refund_id;
+		$scope = RetryState::scope_refund( (int) $refund_id );
 
-		if ( ! SyncLock::acquire( $lock ) ) {
+		if ( ! RetryState::is_due( $order, $scope ) || ! SyncLock::acquire( $lock ) ) {
 			return;
 		}
 
 		try {
 			$this->credits->create_for_refund( $order, $refund );
+			RetryState::clear( $order, $scope );
+			$order->save();
 		} catch ( Throwable $e ) {
 			$message = ErrorMessage::sanitize( $e->getMessage() );
 
-			if ( RetryState::record_failure( $order, $message ) ) {
+			if ( RetryState::record_failure( $order, $message, $scope ) ) {
 				$order->add_order_note(
 					\sprintf(
 						/* translators: %s: error message */
@@ -168,9 +171,25 @@ class RegisterJobs implements ServiceInterface {
 				'limit'      => 20,
 				'status'     => [ 'wc-processing', 'wc-completed' ],
 				'meta_query' => [ // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query
+					'relation' => 'AND',
 					[
 						'key'     => OrderMetaKeys::SYNC_COMPLETE,
 						'compare' => 'NOT EXISTS',
+					],
+					// Filter backing-off orders in SQL: doing it in PHP lets a
+					// handful of permanently failing orders fill the whole window.
+					[
+						'relation' => 'OR',
+						[
+							'key'     => OrderMetaKeys::NEXT_ATTEMPT_AT,
+							'compare' => 'NOT EXISTS',
+						],
+						[
+							'key'     => OrderMetaKeys::NEXT_ATTEMPT_AT,
+							'value'   => (string) \time(),
+							'compare' => '<=',
+							'type'    => 'NUMERIC',
+						],
 					],
 				],
 				'return'     => 'objects',

@@ -42,8 +42,9 @@ final class ErrorMessage {
 			$message = __( 'Unknown e-Financials API error.', 'e-financials' );
 		}
 
-		if ( \strlen( $message ) > self::MAX_LENGTH ) {
-			$message = \rtrim( \substr( $message, 0, self::MAX_LENGTH ) ) . '…';
+		if ( \mb_strlen( $message ) > self::MAX_LENGTH ) {
+			// Byte-wise truncation would split multibyte characters (ä, ü, õ).
+			$message = \rtrim( \mb_substr( $message, 0, self::MAX_LENGTH ) ) . '…';
 		}
 
 		return $message;

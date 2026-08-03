@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace Aanndryyyy\EFinancialsPlugin\Integration;
 
+use Aanndryyyy\EFinancialsPlugin\Api\RemoteLookup;
 use Aanndryyyy\EFinancialsPlugin\Settings\SettingsRepository;
 use Aanndryyyy\EFinancialsPlugin\Support\ErrorMessage;
 use EFinancials;
@@ -149,7 +150,7 @@ class EFinancialsIntegration extends \WC_Integration {
 			self::SETTING_KEY_SALE_ARTICLE_MAP         => [
 				'title'       => __( 'VAT rate → sale article map (JSON)', 'e-financials' ),
 				'type'        => 'textarea',
-				'description' => __( 'Required for mixed-rate catalogues. Example: {"22":1,"9":5}. Each order line uses the article mapped to its WooCommerce tax rate; unmapped rates fall back to the default article and sync fails if the rates disagree.', 'e-financials' ),
+				'description' => __( 'Required for mixed-rate catalogues and for 0% lines — including shops with WooCommerce taxes switched off, where every line is 0%. Example: {"22":1,"9":5,"0":12}. Each order line uses the article mapped to its WooCommerce tax rate; unmapped rates fall back to the default article and sync fails if the rates disagree.', 'e-financials' ),
 				'default'     => '',
 				'css'         => 'width:100%;min-height:80px;font-family:monospace',
 			],
@@ -243,6 +244,12 @@ class EFinancialsIntegration extends \WC_Integration {
 
 		foreach ( [ 'series', 'templates', 'articles' ] as $bucket ) {
 			\delete_transient( self::OPTIONS_TRANSIENT_PREFIX . $bucket );
+		}
+
+		// Credentials or environment may have changed; ids cached for the old
+		// tenant must never be reused on the new one.
+		foreach ( RemoteLookup::cache_keys() as $key ) {
+			\delete_transient( $key );
 		}
 	}
 

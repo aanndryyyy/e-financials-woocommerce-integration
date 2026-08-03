@@ -78,7 +78,9 @@ test.describe( 'e-Financials live demo API @live', () => {
 		);
 		await expect( template ).toBeVisible();
 		const options = await template.locator( 'option' ).allTextContents();
-		expect( options.some( ( t ) => ! /Save credentials/i.test( t ) ) ).toBeTruthy();
+		expect(
+			options.some( ( t ) => ! /Could not load options/i.test( t ) )
+		).toBeTruthy();
 	} );
 
 	test( 'paid order syncs to a demo sale invoice', async () => {

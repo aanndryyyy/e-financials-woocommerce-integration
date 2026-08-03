@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace Aanndryyyy\EFinancialsPlugin\Api;
 
+use Aanndryyyy\EFinancialsPlugin\Settings\SettingsRepository;
 use Aanndryyyy\EFinancialsPlugin\Support\Logger;
 
 /**
@@ -35,14 +36,21 @@ class RemoteLookup {
 	/**
 	 * Provide arguments.
 	 *
-	 * @param ClientFactory $client_factory API client factory.
-	 * @param Logger        $logger         Logger.
+	 * @param ClientFactory      $client_factory API client factory.
+	 * @param SettingsRepository $settings       Settings.
+	 * @param Logger             $logger         Logger.
 	 */
 	public function __construct(
 		private readonly ClientFactory $client_factory,
+		private readonly SettingsRepository $settings,
 		private readonly Logger $logger
 	) {
 	}
+
+	/**
+	 * Transient key prefix, scoped per environment.
+	 */
+	public const CACHE_PREFIX = 'ef_lookup_';
 
 	/**
 	 * Find an existing product id by its catalogue code.
@@ -123,8 +131,8 @@ class RemoteLookup {
 	 */
 	public function flush(): void {
 
-		foreach ( [ 'series', 'articles', 'products', 'clients' ] as $bucket ) {
-			\delete_transient( $this->cache_key( $bucket ) );
+		foreach ( self::cache_keys() as $key ) {
+			\delete_transient( $key );
 		}
 	}
 
@@ -279,6 +287,25 @@ class RemoteLookup {
 	 */
 	private function cache_key( string $bucket ): string {
 
-		return 'ef_lookup_' . $bucket;
+		// Demo and live tenants hold different ids for the same code or email.
+		return self::CACHE_PREFIX . ( $this->settings->is_live() ? 'live_' : 'test_' ) . $bucket;
+	}
+
+	/**
+	 * Every transient name this class can write.
+	 *
+	 * @return array<int, string>
+	 */
+	public static function cache_keys(): array {
+
+		$keys = [];
+
+		foreach ( [ 'live_', 'test_' ] as $env ) {
+			foreach ( [ 'series', 'articles', 'products', 'clients' ] as $bucket ) {
+				$keys[] = self::CACHE_PREFIX . $env . $bucket;
+			}
+		}
+
+		return $keys;
 	}
 }
