@@ -160,6 +160,54 @@ class SettingsRepository {
 	}
 
 	/**
+	 * Sale article to use for a given VAT percentage.
+	 *
+	 * Falls back to the default sale article when the rate is not mapped.
+	 *
+	 * @param float $vat_rate VAT percentage.
+	 */
+	public function sale_article_for_rate( float $vat_rate ): int {
+
+		$map = $this->sale_article_map();
+		$key = \rtrim( \rtrim( \number_format( $vat_rate, 2, '.', '' ), '0' ), '.' );
+
+		return $map[ $key ] ?? $this->sale_article_id();
+	}
+
+	/**
+	 * VAT percentage → cl_sale_articles_id map.
+	 *
+	 * @return array<string, int>
+	 */
+	public function sale_article_map(): array {
+
+		$raw = $this->get_string( EFinancialsIntegration::SETTING_KEY_SALE_ARTICLE_MAP );
+
+		if ( $raw === '' ) {
+			return [];
+		}
+
+		$decoded = \json_decode( $raw, true );
+
+		if ( ! \is_array( $decoded ) ) {
+			return [];
+		}
+
+		$map = [];
+
+		foreach ( $decoded as $rate => $article_id ) {
+			if ( ! \is_numeric( $rate ) || ! \is_numeric( $article_id ) ) {
+				continue;
+			}
+
+			$key         = \rtrim( \rtrim( \number_format( (float) $rate, 2, '.', '' ), '0' ), '.' );
+			$map[ $key ] = (int) $article_id;
+		}
+
+		return $map;
+	}
+
+	/**
 	 * Invoice payment term days.
 	 */
 	public function term_days(): int {

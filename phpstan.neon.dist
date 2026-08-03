@@ -14,4 +14,3 @@ parameters:
     - identifier: cast.useless
     - identifier: thecodingmachine.exceptionMustBeRethrown
     - identifier: thecodingmachine.superglobalUsed
-    - identifier: thecodingmachine.emptyCatch

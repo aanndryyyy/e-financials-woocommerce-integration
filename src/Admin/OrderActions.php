@@ -9,7 +9,10 @@ declare(strict_types=1);
 
 namespace Aanndryyyy\EFinancialsPlugin\Admin;
 
+use Aanndryyyy\EFinancialsPlugin\Support\ErrorMessage;
+use Aanndryyyy\EFinancialsPlugin\Support\Logger;
 use Aanndryyyy\EFinancialsPlugin\Support\OrderMeta;
+use Aanndryyyy\EFinancialsPlugin\Support\RetryState;
 
 use Aanndryyyy\EFinancialsPlugin\Api\ClientFactory;
 use Aanndryyyy\EFinancialsPlugin\Meta\OrderMetaKeys;
@@ -28,19 +31,19 @@ class OrderActions implements ServiceInterface {
 
 	public const ACTION_DELIVER = 'ef_deliver_invoice';
 
-	public const ACTION_PDF = 'ef_download_pdf';
-
 	/**
 	 * Provide arguments.
 	 *
 	 * @param OrderSyncService $sync     Sync service (for immediate admin sync).
 	 * @param DeliveryService  $delivery Delivery.
 	 * @param ClientFactory    $clients  Client factory.
+	 * @param Logger           $logger   Logger.
 	 */
 	public function __construct(
 		private readonly OrderSyncService $sync,
 		private readonly DeliveryService $delivery,
-		private readonly ClientFactory $clients
+		private readonly ClientFactory $clients,
+		private readonly Logger $logger
 	) {
 	}
 
@@ -56,7 +59,6 @@ class OrderActions implements ServiceInterface {
 		\add_filter( 'woocommerce_order_actions', [ $this, 'register_actions' ] );
 		\add_action( 'woocommerce_order_action_' . self::ACTION_SYNC, [ $this, 'handle_sync' ] );
 		\add_action( 'woocommerce_order_action_' . self::ACTION_DELIVER, [ $this, 'handle_deliver' ] );
-		\add_action( 'woocommerce_order_action_' . self::ACTION_PDF, [ $this, 'handle_pdf' ] );
 	}
 
 	/**
@@ -74,7 +76,6 @@ class OrderActions implements ServiceInterface {
 
 		$actions[ self::ACTION_SYNC ]    = __( 'Send / resend to e-Financials', 'e-financials' );
 		$actions[ self::ACTION_DELIVER ] = __( 'Deliver e-Financials invoice', 'e-financials' );
-		$actions[ self::ACTION_PDF ]     = __( 'Download e-Financials PDF', 'e-financials' );
 
 		return $actions;
 	}
@@ -86,12 +87,22 @@ class OrderActions implements ServiceInterface {
 	 */
 	public function handle_sync( WC_Order $order ): void {
 
+		// Retrying by hand means the merchant fixed something, so clear the backoff.
+		RetryState::clear( $order );
+		$order->save();
+
 		try {
-			// Clear invoice id only when forcing resend via deleting? Keep idempotent — sync skips if present.
-			// For resend after failure, just run again.
+			// Idempotent: sync skips when an invoice already exists.
 			$this->sync->sync_order( $order->get_id() );
-		} catch ( Throwable $e ) { // phpcs:ignore Generic.CodeAnalysis.EmptyStatement.DetectedCatch
-			// Error already stored on order by OrderSyncService.
+		} catch ( Throwable $e ) {
+			// OrderSyncService already recorded the sanitised error and noted it.
+			$this->logger->error(
+				'Manual order sync action failed.',
+				[
+					'order_id' => $order->get_id(),
+					'error'    => $e->getMessage(),
+				]
+			);
 		}
 	}
 
@@ -114,42 +125,16 @@ class OrderActions implements ServiceInterface {
 		try {
 			$this->delivery->deliver( $order, $invoice_id, false );
 		} catch ( Throwable $e ) {
-			$order->update_meta_data( OrderMetaKeys::LAST_ERROR, $e->getMessage() );
+			$message = ErrorMessage::sanitize( $e->getMessage() );
+			$order->update_meta_data( OrderMetaKeys::LAST_ERROR, $message );
 			$order->add_order_note(
 				\sprintf(
 					/* translators: %s: error */
 					__( 'e-Financials deliver failed: %s', 'e-financials' ),
-					$e->getMessage()
+					$message
 				)
 			);
 			$order->save();
 		}
-	}
-
-	/**
-	 * Provide arguments.
-	 *
-	 * @param WC_Order $order Order.
-	 */
-	public function handle_pdf( WC_Order $order ): void {
-
-		$invoice_id = OrderMeta::get_int( $order, OrderMetaKeys::SALE_INVOICE_ID );
-
-		if ( $invoice_id <= 0 ) {
-			$order->add_order_note( __( 'Cannot download PDF: no e-Financials invoice on this order.', 'e-financials' ) );
-			$order->save();
-
-			return;
-		}
-
-		// Store a one-shot admin notice flag; actual download goes through metabox AJAX for binary output.
-		$order->add_order_note(
-			\sprintf(
-				/* translators: %d: invoice id */
-				__( 'Use the e-Financials metabox to download PDF for invoice #%d.', 'e-financials' ),
-				$invoice_id
-			)
-		);
-		$order->save();
 	}
 }

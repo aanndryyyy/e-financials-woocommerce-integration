@@ -13,7 +13,8 @@
 		<exclude name="WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase"/>
 		<!-- Exception messages are not HTML output. -->
 		<exclude name="WordPress.Security.EscapeOutput.ExceptionNotEscaped"/>
-		<!-- Action Scheduler / retry sweep intentionally runs every 5 minutes. -->
+		<!-- Action Scheduler / retry sweep intentionally runs every 5 minutes;
+			 orders that keep failing back off exponentially (see RetryState). -->
 		<exclude name="WordPress.WP.CronInterval.CronSchedulesInterval"/>
 	</rule>
 

@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace Aanndryyyy\EFinancialsPlugin\Integration;
 
 use Aanndryyyy\EFinancialsPlugin\Settings\SettingsRepository;
+use Aanndryyyy\EFinancialsPlugin\Support\ErrorMessage;
 use EFinancials;
 use Throwable;
 
@@ -36,6 +37,8 @@ class EFinancialsIntegration extends \WC_Integration {
 
 	public const SETTING_KEY_SALE_ARTICLE_ID = 'cl_sale_articles_id';
 
+	public const SETTING_KEY_SALE_ARTICLE_MAP = 'cl_sale_articles_map';
+
 	public const SETTING_KEY_TERM_DAYS = 'term_days';
 
 	public const SETTING_KEY_USE_WC_ORDER_NUMBER = 'use_wc_order_number';
@@ -53,6 +56,10 @@ class EFinancialsIntegration extends \WC_Integration {
 	public const SETTING_KEY_AUTO_DELIVER_EINVOICE = 'auto_deliver_einvoice';
 
 	public const SETTING_KEY_PRODUCT_AUTO_SYNC = 'product_auto_sync';
+
+	private const OPTIONS_TRANSIENT_PREFIX = 'ef_settings_options_';
+
+	private const OPTIONS_TRANSIENT_TTL = 3600;
 
 	/**
 	 * Init and hook in the integration.
@@ -75,9 +82,9 @@ class EFinancialsIntegration extends \WC_Integration {
 	 */
 	public function init_form_fields(): void {
 
-		$series_options   = $this->safe_id_options( [ $this, 'fetch_invoice_series_options' ] );
-		$template_options = $this->safe_id_options( [ $this, 'fetch_template_options' ] );
-		$article_options  = $this->safe_id_options( [ $this, 'fetch_sale_article_options' ] );
+		$series_options   = $this->safe_id_options( 'series', [ $this, 'fetch_invoice_series_options' ] );
+		$template_options = $this->safe_id_options( 'templates', [ $this, 'fetch_template_options' ] );
+		$article_options  = $this->safe_id_options( 'articles', [ $this, 'fetch_sale_article_options' ] );
 
 		$this->form_fields = [
 			'api_section'                              => [
@@ -121,7 +128,7 @@ class EFinancialsIntegration extends \WC_Integration {
 			self::SETTING_KEY_INVOICE_SERIES_ID        => [
 				'title'       => __( 'Invoice series', 'e-financials' ),
 				'type'        => 'select',
-				'description' => __( 'Required setup: choose the e-Financials invoice series used for new sale invoices.', 'e-financials' ),
+				'description' => __( 'Number prefix of the selected series is sent as number_prefix on every sale invoice. Leave empty to let e-Financials number invoices itself.', 'e-financials' ),
 				'default'     => '',
 				'options'     => $series_options,
 			],
@@ -135,9 +142,16 @@ class EFinancialsIntegration extends \WC_Integration {
 			self::SETTING_KEY_SALE_ARTICLE_ID          => [
 				'title'       => __( 'Default sale article', 'e-financials' ),
 				'type'        => 'select',
-				'description' => __( 'Optional default cl_sale_articles_id for invoice rows / products.', 'e-financials' ),
+				'description' => __( 'Required: e-Financials refuses to create products without a sale account, and books VAT by article. Its VAT rate must match the rate your shop charges.', 'e-financials' ),
 				'default'     => '',
 				'options'     => $article_options,
+			],
+			self::SETTING_KEY_SALE_ARTICLE_MAP         => [
+				'title'       => __( 'VAT rate → sale article map (JSON)', 'e-financials' ),
+				'type'        => 'textarea',
+				'description' => __( 'Required for mixed-rate catalogues. Example: {"22":1,"9":5}. Each order line uses the article mapped to its WooCommerce tax rate; unmapped rates fall back to the default article and sync fails if the rates disagree.', 'e-financials' ),
+				'default'     => '',
+				'css'         => 'width:100%;min-height:80px;font-family:monospace',
 			],
 			self::SETTING_KEY_TERM_DAYS                => [
 				'title'   => __( 'Payment term (days)', 'e-financials' ),
@@ -216,9 +230,61 @@ class EFinancialsIntegration extends \WC_Integration {
 
 		$result = parent::process_admin_options();
 
+		$this->flush_option_cache();
 		$this->maybe_connection_ping();
 
 		return $result;
+	}
+
+	/**
+	 * Drop cached remote option lists after a settings change.
+	 */
+	private function flush_option_cache(): void {
+
+		foreach ( [ 'series', 'templates', 'articles' ] as $bucket ) {
+			\delete_transient( self::OPTIONS_TRANSIENT_PREFIX . $bucket );
+		}
+	}
+
+	/**
+	 * Whether the current request is this integration's settings screen.
+	 *
+	 * Remote option lists are only worth loading there; every other admin
+	 * request that instantiates integrations must stay HTTP-free.
+	 */
+	private function is_own_settings_screen(): bool {
+
+		if ( ! \is_admin() ) {
+			return false;
+		}
+
+		$page    = $this->query_arg( 'page' );
+		$tab     = $this->query_arg( 'tab' );
+		$section = $this->query_arg( 'section' );
+
+		if ( $page !== 'wc-settings' || $tab !== 'integration' ) {
+			return false;
+		}
+
+		// An empty section means WooCommerce is showing the first integration.
+		return $section === '' || $section === $this->id;
+	}
+
+	/**
+	 * Read a string query argument.
+	 *
+	 * @param string $key Query key.
+	 */
+	private function query_arg( string $key ): string {
+
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized, WordPress.Security.ValidatedSanitizedInput.MissingUnslash -- Sanitized below once the type is known.
+		$value = $_GET[ $key ] ?? '';
+
+		if ( ! \is_string( $value ) ) {
+			return '';
+		}
+
+		return \sanitize_text_field( \wp_unslash( $value ) );
 	}
 
 	/**
@@ -249,12 +315,11 @@ class EFinancialsIntegration extends \WC_Integration {
 
 			\WC_Admin_Settings::add_message( __( 'e-Financials connection OK.', 'e-financials' ) );
 		} catch ( Throwable $e ) {
-			// Keep this as a message (not add_error) so the settings-saved notice still shows.
-			\WC_Admin_Settings::add_message(
+			\WC_Admin_Settings::add_error(
 				\sprintf(
 					/* translators: %s: error */
 					__( 'e-Financials connection failed: %s', 'e-financials' ),
-					$e->getMessage()
+					ErrorMessage::sanitize( $e->getMessage() )
 				)
 			);
 		}
@@ -263,19 +328,43 @@ class EFinancialsIntegration extends \WC_Integration {
 	/**
 	 * Provide arguments.
 	 *
+	 * @param string                                $bucket   Cache bucket name.
 	 * @param callable(): array<int|string, string> $callback Options loader.
 	 *
 	 * @return array<int|string, string>
 	 */
-	private function safe_id_options( callable $callback ): array {
+	private function safe_id_options( string $bucket, callable $callback ): array {
 
 		$blank = [ '' => __( '— Select —', 'e-financials' ) ];
 
-		try {
-			return $blank + $callback();
-		} catch ( Throwable $e ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found
-			return $blank + [ '' => __( 'Save credentials to load options', 'e-financials' ) ];
+		if ( ! $this->is_own_settings_screen() ) {
+			return $blank;
 		}
+
+		$cached = \get_transient( self::OPTIONS_TRANSIENT_PREFIX . $bucket );
+
+		if ( \is_array( $cached ) ) {
+			/**
+			 * Cached option list.
+			 *
+			 * @var array<int|string, string> $cached
+			 */
+			return $blank + $cached;
+		}
+
+		try {
+			$options = $callback();
+		} catch ( Throwable $e ) {
+			\error_log( // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Surfaces why the option list is empty.
+				'[e-financials] Failed to load ' . $bucket . ' options: ' . $e->getMessage()
+			);
+
+			return $blank + [ '' => __( 'Could not load options — check credentials and the error log', 'e-financials' ) ];
+		}
+
+		\set_transient( self::OPTIONS_TRANSIENT_PREFIX . $bucket, $options, self::OPTIONS_TRANSIENT_TTL );
+
+		return $blank + $options;
 	}
 
 	/**

@@ -12,7 +12,10 @@ namespace Aanndryyyy\EFinancialsPlugin\Queue;
 use Aanndryyyy\EFinancialsPlugin\Api\ClientFactory;
 use Aanndryyyy\EFinancialsPlugin\Meta\OrderMetaKeys;
 use Aanndryyyy\EFinancialsPlugin\Services\ServiceInterface;
+use Aanndryyyy\EFinancialsPlugin\Support\ErrorMessage;
 use Aanndryyyy\EFinancialsPlugin\Support\Logger;
+use Aanndryyyy\EFinancialsPlugin\Support\RetryState;
+use Aanndryyyy\EFinancialsPlugin\Support\SyncLock;
 use Aanndryyyy\EFinancialsPlugin\Sync\CreditInvoiceService;
 use Aanndryyyy\EFinancialsPlugin\Sync\OrderSyncService;
 use Throwable;
@@ -111,10 +114,27 @@ class RegisterJobs implements ServiceInterface {
 			return;
 		}
 
+		$lock = 'refund-' . (int) $refund_id;
+
+		if ( ! SyncLock::acquire( $lock ) ) {
+			return;
+		}
+
 		try {
 			$this->credits->create_for_refund( $order, $refund );
 		} catch ( Throwable $e ) {
-			$order->update_meta_data( OrderMetaKeys::LAST_ERROR, $e->getMessage() );
+			$message = ErrorMessage::sanitize( $e->getMessage() );
+
+			if ( RetryState::record_failure( $order, $message ) ) {
+				$order->add_order_note(
+					\sprintf(
+						/* translators: %s: error message */
+						__( 'e-Financials credit invoice failed: %s', 'e-financials' ),
+						$message
+					)
+				);
+			}
+
 			$order->save();
 			$this->logger->error(
 				'Credit invoice job failed.',
@@ -126,11 +146,16 @@ class RegisterJobs implements ServiceInterface {
 			);
 
 			throw $e;
+		} finally {
+			SyncLock::release( $lock );
 		}
 	}
 
 	/**
-	 * Sweep paid orders that never received a sale invoice.
+	 * Sweep paid orders whose sync pipeline never completed.
+	 *
+	 * The marker is SYNC_COMPLETE rather than the invoice id, so an order whose
+	 * invoice registered but whose payment recording failed is still retried.
 	 */
 	public function handle_sweep(): void {
 
@@ -144,7 +169,7 @@ class RegisterJobs implements ServiceInterface {
 				'status'     => [ 'wc-processing', 'wc-completed' ],
 				'meta_query' => [ // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query
 					[
-						'key'     => OrderMetaKeys::SALE_INVOICE_ID,
+						'key'     => OrderMetaKeys::SYNC_COMPLETE,
 						'compare' => 'NOT EXISTS',
 					],
 				],
@@ -162,6 +187,11 @@ class RegisterJobs implements ServiceInterface {
 		 * @var array<int, WC_Order> $orders
 		 */
 		foreach ( $orders as $order ) {
+			// Backing-off orders must not burn a job slot every five minutes.
+			if ( ! RetryState::is_due( $order ) ) {
+				continue;
+			}
+
 			$this->scheduler->enqueue_sync_order( $order->get_id() );
 		}
 	}

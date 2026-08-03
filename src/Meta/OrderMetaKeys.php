@@ -32,6 +32,15 @@ final class OrderMetaKeys {
 
 	public const CREDIT_SALE_INVOICE_ID = '_ef_credit_sale_invoice_id';
 
+	public const ATTEMPTS = '_ef_attempts';
+
+	public const NEXT_ATTEMPT_AT = '_ef_next_attempt_at';
+
+	/**
+	 * Set only when the whole pipeline (invoice + payment + delivery) succeeded.
+	 */
+	public const SYNC_COMPLETE = '_ef_sync_complete';
+
 	/**
 	 * Per-refund credit invoice meta key.
 	 *

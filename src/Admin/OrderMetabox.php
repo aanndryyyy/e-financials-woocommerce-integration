@@ -167,8 +167,12 @@ class OrderMetabox implements ServiceInterface {
 
 		try {
 			$file     = $this->delivery->get_system_pdf( $invoice_id );
-			$binary   = \base64_decode( $file['contents'], true ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode -- API returns base64 PDF.
-			$contents = $binary !== false ? $binary : $file['contents'];
+			$contents = \base64_decode( $file['contents'], true ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode -- API returns base64 PDF.
+
+			if ( $contents === false || \strncmp( $contents, '%PDF', 4 ) !== 0 ) {
+				// Never hand the browser a non-PDF body under a PDF content type.
+				\wp_die( \esc_html__( 'e-Financials returned an unreadable PDF.', 'e-financials' ), 502 );
+			}
 
 			\nocache_headers();
 			\header( 'Content-Type: application/pdf' );

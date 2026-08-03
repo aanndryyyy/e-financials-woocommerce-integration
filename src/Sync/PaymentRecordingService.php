@@ -151,10 +151,22 @@ class PaymentRecordingService {
 		$paid = $order->get_date_paid();
 		$date = $paid instanceof \WC_DateTime ? $paid->date( 'Y-m-d' ) : \gmdate( 'Y-m-d' );
 
+		// Prior partial refunds must not be re-received.
+		$amount = \round( (float) $order->get_total() - (float) $order->get_total_refunded(), 2 );
+
+		if ( $amount <= 0.0 ) {
+			$this->logger->info(
+				'Skipping payment transaction: nothing outstanding after refunds.',
+				[ 'order_id' => $order->get_id() ]
+			);
+
+			return;
+		}
+
 		$payload = [
 			'accounts_dimensions_id' => $accounts_dimensions_id,
 			'type'                   => self::TRANSACTION_TYPE_INCOMING,
-			'amount'                 => (float) $order->get_total(),
+			'amount'                 => $amount,
 			'cl_currencies_id'       => $order->get_currency(),
 			'date'                   => $date,
 			'clients_id'             => $clients_id,
@@ -179,7 +191,7 @@ class PaymentRecordingService {
 				[
 					'related_table' => self::RELATED_TABLE_SALE_INVOICES,
 					'related_id'    => $invoice_id,
-					'amount'        => (float) $order->get_total(),
+					'amount'        => $amount,
 				],
 			]
 		);

@@ -10,11 +10,12 @@ declare(strict_types=1);
 namespace Aanndryyyy\EFinancialsPlugin\Sync;
 
 use Aanndryyyy\EFinancialsPlugin\Api\ClientFactory;
+use Aanndryyyy\EFinancialsPlugin\Api\RemoteLookup;
 use Aanndryyyy\EFinancialsPlugin\Meta\OrderMetaKeys;
+use Aanndryyyy\EFinancialsPlugin\Meta\UserMetaKeys;
 use Aanndryyyy\EFinancialsPlugin\Support\CountryCodes;
 use Aanndryyyy\EFinancialsPlugin\Support\Logger;
 use Aanndryyyy\EFinancialsPlugin\Support\OrderMeta;
-use EFinancialsClient\Responses\Clients\ClientResponse;
 use RuntimeException;
 use WC_Order;
 
@@ -27,10 +28,12 @@ class ClientUpsertService {
 	 * Provide arguments.
 	 *
 	 * @param ClientFactory $client_factory API client factory.
+	 * @param RemoteLookup  $lookup         Cached API lookups.
 	 * @param Logger        $logger         Logger.
 	 */
 	public function __construct(
 		private readonly ClientFactory $client_factory,
+		private readonly RemoteLookup $lookup,
 		private readonly Logger $logger
 	) {
 	}
@@ -53,7 +56,7 @@ class ClientUpsertService {
 		$customer_id = $order->get_customer_id();
 
 		if ( $customer_id > 0 ) {
-			$from_user_raw = \get_user_meta( $customer_id, OrderMetaKeys::CLIENTS_ID, true );
+			$from_user_raw = \get_user_meta( $customer_id, UserMetaKeys::CLIENTS_ID, true );
 			$from_user     = \is_numeric( $from_user_raw ) ? (int) $from_user_raw : 0;
 
 			if ( $from_user > 0 ) {
@@ -67,11 +70,11 @@ class ClientUpsertService {
 		$client     = $this->client_factory->make();
 		$payload    = $this->build_payload( $order );
 		$email      = \strtolower( \trim( $order->get_billing_email() ) );
-		$matched    = $email !== '' ? $this->find_by_email( $client->clients()->all( 1 ), $email ) : null;
+		$matched    = $this->lookup->client_id_by_email( $email );
 		$clients_id = 0;
 
-		if ( $matched instanceof ClientResponse && $matched->id !== null ) {
-			$clients_id = (int) $matched->id;
+		if ( $matched !== null && $matched > 0 ) {
+			$clients_id = $matched;
 			$response   = $client->clients()->update( $clients_id, $payload );
 
 			if ( ! $response->successful() ) {
@@ -89,13 +92,14 @@ class ClientUpsertService {
 			}
 
 			$clients_id = (int) $response->createdObjectId;
+			$this->lookup->flush();
 		}
 
 		OrderMeta::set( $order, OrderMetaKeys::CLIENTS_ID, $clients_id );
 		$order->save();
 
 		if ( $customer_id > 0 ) {
-			\update_user_meta( $customer_id, OrderMetaKeys::CLIENTS_ID, $clients_id );
+			\update_user_meta( $customer_id, UserMetaKeys::CLIENTS_ID, $clients_id );
 		}
 
 		$this->logger->info(
@@ -167,22 +171,5 @@ class ClientUpsertService {
 			'invoice_vat_no'                   => $vat !== '' ? $vat : null,
 			'code'                             => ( OrderMeta::get_string( $order, '_billing_registry_code' ) !== '' ) ? OrderMeta::get_string( $order, '_billing_registry_code' ) : null,
 		];
-	}
-
-	/**
-	 * Provide arguments.
-	 *
-	 * @param \EFinancialsClient\Responses\Clients\ListResponse $clients Client list page.
-	 * @param string                                            $email   Billing email.
-	 */
-	private function find_by_email( \EFinancialsClient\Responses\Clients\ListResponse $clients, string $email ): ?ClientResponse {
-
-		foreach ( $clients->items as $item ) {
-			if ( $item->email !== null && \strtolower( $item->email ) === $email ) {
-				return $item;
-			}
-		}
-
-		return null;
 	}
 }

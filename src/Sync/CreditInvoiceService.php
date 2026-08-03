@@ -10,15 +10,22 @@ declare(strict_types=1);
 namespace Aanndryyyy\EFinancialsPlugin\Sync;
 
 use Aanndryyyy\EFinancialsPlugin\Api\ClientFactory;
+use Aanndryyyy\EFinancialsPlugin\Api\RemoteLookup;
 use Aanndryyyy\EFinancialsPlugin\Meta\OrderMetaKeys;
 use Aanndryyyy\EFinancialsPlugin\Settings\SettingsRepository;
 use Aanndryyyy\EFinancialsPlugin\Support\CountryCodes;
+use Aanndryyyy\EFinancialsPlugin\Support\InvoiceNumber;
 use Aanndryyyy\EFinancialsPlugin\Support\Logger;
 use Aanndryyyy\EFinancialsPlugin\Support\OrderMeta;
+use Aanndryyyy\EFinancialsPlugin\Support\RefundAmounts;
+use Aanndryyyy\EFinancialsPlugin\Support\TaxRates;
 use RuntimeException;
 use WC_Order;
+use WC_Order_Item_Fee;
 use WC_Order_Item_Product;
+use WC_Order_Item_Shipping;
 use WC_Order_Refund;
+use WC_Product;
 
 /**
  * Credit invoice create + register for full/partial refunds.
@@ -29,12 +36,14 @@ class CreditInvoiceService {
 	 * Provide arguments.
 	 *
 	 * @param ClientFactory        $client_factory API factory.
+	 * @param RemoteLookup         $lookup         Cached API lookups.
 	 * @param SettingsRepository   $settings       Settings.
 	 * @param ProductEnsureService $products       Products.
 	 * @param Logger               $logger         Logger.
 	 */
 	public function __construct(
 		private readonly ClientFactory $client_factory,
+		private readonly RemoteLookup $lookup,
 		private readonly SettingsRepository $settings,
 		private readonly ProductEnsureService $products,
 		private readonly Logger $logger
@@ -86,7 +95,8 @@ class CreditInvoiceService {
 			'cl_templates_id'         => $template_id,
 			'clients_id'              => $clients_id,
 			'cl_countries_id'         => CountryCodes::to_alpha3( $order->get_billing_country() ),
-			'number_suffix'           => \substr( 'C' . $order->get_order_number() . '-' . $refund->get_id(), 0, 30 ),
+			// The API rejects non-numeric invoice numbers; the refund id is unique on its own.
+			'number_suffix'           => InvoiceNumber::suffix( (string) $refund->get_id(), $refund->get_id() ),
 			'create_date'             => $date,
 			'journal_date'            => $date,
 			'term_days'               => $this->settings->term_days(),
@@ -95,6 +105,12 @@ class CreditInvoiceService {
 			'notes'                   => 'WooCommerce refund #' . $refund->get_id() . ' for order #' . $order->get_order_number(),
 			'items'                   => $items,
 		];
+
+		$prefix = $this->lookup->series_number_prefix( $this->settings->invoice_series_id() );
+
+		if ( $prefix !== '' ) {
+			$payload['number_prefix'] = $prefix;
+		}
 
 		$client   = $this->client_factory->make();
 		$response = $client->salesInvoices()->create( $payload );
@@ -139,7 +155,11 @@ class CreditInvoiceService {
 	}
 
 	/**
-	 * Provide arguments.
+	 * Build the credited rows for a refund.
+	 *
+	 * Only what the refund actually covers is credited: itemised refunds map row
+	 * by row, and an amount-only refund becomes a single row bounded by the
+	 * refund total. The full order composition is never used as a fallback.
 	 *
 	 * @param WC_Order        $order  Order.
 	 * @param WC_Order_Refund $refund Refund.
@@ -150,64 +170,133 @@ class CreditInvoiceService {
 	 */
 	private function build_credit_items( WC_Order $order, WC_Order_Refund $refund ): array {
 
-		$refund_items = $refund->get_items( 'line_item' );
+		$items = $this->build_itemised_credit( $refund );
 
-		if ( $refund_items !== [] ) {
-			// Rebuild using parent ensure logic on a temporary mapping of absolute amounts.
-			$items = [];
+		if ( $items !== [] ) {
+			return $items;
+		}
 
-			foreach ( $refund_items as $item ) {
-				if ( ! $item instanceof WC_Order_Item_Product ) {
+		return [ $this->build_amount_only_credit( $order, $refund ) ];
+	}
+
+	/**
+	 * Map refunded lines, shipping and fees to credit rows.
+	 *
+	 * @param WC_Order_Refund $refund Refund.
+	 *
+	 * @return array<int, array<string, mixed>>
+	 *
+	 * @throws RuntimeException When a VAT rate or sale article cannot be resolved.
+	 */
+	private function build_itemised_credit( WC_Order_Refund $refund ): array {
+
+		$items = [];
+
+		foreach ( [ 'line_item', 'shipping', 'fee' ] as $type ) {
+			foreach ( $refund->get_items( $type ) as $item ) {
+				if ( ! $item instanceof WC_Order_Item_Product
+					&& ! $item instanceof WC_Order_Item_Shipping
+					&& ! $item instanceof WC_Order_Item_Fee
+				) {
 					continue;
 				}
 
-				$qty = \abs( (float) $item->get_quantity() );
 				$net = \abs( (float) $item->get_total() );
 				$tax = \abs( (float) $item->get_total_tax() );
 
-				if ( $qty <= 0 && $net <= 0 ) {
+				if ( $net <= 0.0 && $tax <= 0.0 ) {
 					continue;
 				}
 
-				if ( $qty <= 0 ) {
-					$qty = 1;
-				}
+				$qty = $item instanceof WC_Order_Item_Product
+					? \abs( (float) $item->get_quantity() )
+					: 1.0;
 
-				// Prefer linked product from parent line when available.
-				$products_id = 0;
-				$product     = $item->get_product();
-
-				if ( $product instanceof \WC_Product ) {
-					$products_id = $this->products->ensure_product( $product );
-				}
-
-				if ( $products_id <= 0 ) {
-					// Fall back to parent order invoice item rebuild for generic product.
-					$parent_items = $this->products->build_invoice_items( $order );
-					$raw_id       = $parent_items[0]['products_id'] ?? 0;
-					$products_id  = \is_numeric( $raw_id ) ? (int) $raw_id : 0;
-				}
-
-				if ( $products_id <= 0 ) {
-					continue;
-				}
-
-				$items[] = [
-					'products_id'     => $products_id,
-					'amount'          => $qty,
-					'custom_title'    => $item->get_name(),
-					'unit_net_price'  => \round( $net / $qty, 4 ),
-					'total_net_price' => \round( $net, 4 ),
-					'vat_amount'      => \round( $tax, 4 ),
-				];
-			}
-
-			if ( $items !== [] ) {
-				return $items;
+				$items[] = $this->products->build_row(
+					$this->credit_products_id( $item ),
+					$item->get_name(),
+					$qty,
+					$net,
+					$tax,
+					TaxRates::for_item( $item )
+				);
 			}
 		}
 
-		// Full refund without itemised lines — credit the whole original invoice composition.
-		return $this->products->build_invoice_items( $order );
+		return $items;
+	}
+
+	/**
+	 * Build the single row for a refund entered as an amount.
+	 *
+	 * @param WC_Order        $order  Order.
+	 * @param WC_Order_Refund $refund Refund.
+	 *
+	 * @return array<string, mixed>
+	 *
+	 * @throws RuntimeException When the amount is empty or the order mixes VAT rates.
+	 */
+	private function build_amount_only_credit( WC_Order $order, WC_Order_Refund $refund ): array {
+
+		$gross = \abs( (float) $refund->get_amount() );
+
+		if ( $gross <= 0.0 ) {
+			throw new RuntimeException( 'Refund has no amount to credit.' );
+		}
+
+		$rate = TaxRates::single_order_rate( $order );
+
+		if ( $rate === null ) {
+			throw new RuntimeException(
+				'Order mixes VAT rates, so an amount-only refund cannot be credited. Refund the individual line items instead.'
+			);
+		}
+
+		$tax = \abs( (float) $refund->get_total_tax() );
+
+		$amounts = $tax > 0.0
+			? RefundAmounts::split( $gross, $tax )
+			: RefundAmounts::split_at_rate( $gross, $rate );
+
+		return $this->products->build_row(
+			$this->products->ensure_generic_line_id(),
+			\sprintf(
+				/* translators: %d: refund id */
+				__( 'Refund #%d', 'e-financials' ),
+				$refund->get_id()
+			),
+			1.0,
+			$amounts['net'],
+			$amounts['tax'],
+			$rate
+		);
+	}
+
+	/**
+	 * Resolve the catalogue product to credit for a refunded line.
+	 *
+	 * @param WC_Order_Item_Product|WC_Order_Item_Shipping|WC_Order_Item_Fee $item Refunded line.
+	 *
+	 * @throws RuntimeException On API failure.
+	 */
+	private function credit_products_id( object $item ): int {
+
+		if ( $item instanceof WC_Order_Item_Product ) {
+			$product = $item->get_product();
+
+			if ( $product instanceof WC_Product ) {
+				return $this->products->ensure_product( $product );
+			}
+		}
+
+		if ( $item instanceof WC_Order_Item_Shipping ) {
+			return $this->products->ensure_shipping_id();
+		}
+
+		if ( $item instanceof WC_Order_Item_Fee ) {
+			return $this->products->ensure_fee_id();
+		}
+
+		return $this->products->ensure_generic_line_id();
 	}
 }

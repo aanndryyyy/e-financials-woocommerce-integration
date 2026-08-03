@@ -10,9 +10,11 @@ declare(strict_types=1);
 namespace Aanndryyyy\EFinancialsPlugin\Sync;
 
 use Aanndryyyy\EFinancialsPlugin\Api\ClientFactory;
+use Aanndryyyy\EFinancialsPlugin\Api\RemoteLookup;
 use Aanndryyyy\EFinancialsPlugin\Meta\OrderMetaKeys;
 use Aanndryyyy\EFinancialsPlugin\Settings\SettingsRepository;
 use Aanndryyyy\EFinancialsPlugin\Support\CountryCodes;
+use Aanndryyyy\EFinancialsPlugin\Support\InvoiceNumber;
 use Aanndryyyy\EFinancialsPlugin\Support\Logger;
 use Aanndryyyy\EFinancialsPlugin\Support\OrderMeta;
 use RuntimeException;
@@ -31,12 +33,14 @@ class SaleInvoiceService {
 	 * Provide arguments.
 	 *
 	 * @param ClientFactory        $client_factory API factory.
+	 * @param RemoteLookup         $lookup         Cached API lookups.
 	 * @param SettingsRepository   $settings       Settings.
 	 * @param ProductEnsureService $products       Product ensure service.
 	 * @param Logger               $logger         Logger.
 	 */
 	public function __construct(
 		private readonly ClientFactory $client_factory,
+		private readonly RemoteLookup $lookup,
 		private readonly SettingsRepository $settings,
 		private readonly ProductEnsureService $products,
 		private readonly Logger $logger
@@ -88,11 +92,10 @@ class SaleInvoiceService {
 			$cash_fields
 		);
 
-		$series_id = $this->settings->invoice_series_id();
+		$prefix = $this->lookup->series_number_prefix( $this->settings->invoice_series_id() );
 
-		if ( $series_id > 0 ) {
-			// Some tenants expect series via template; keep id in notes for ops.
-			$payload['additional_info_content'] = 'invoice_series_id=' . $series_id;
+		if ( $prefix !== '' ) {
+			$payload['number_prefix'] = $prefix;
 		}
 
 		$client   = $this->client_factory->make();
@@ -118,8 +121,15 @@ class SaleInvoiceService {
 		try {
 			$fetched = $client->salesInvoices()->get( $invoice_id );
 			$number  = $fetched->number ?? '';
-		} catch ( \Throwable $e ) { // @ignoreException
-			unset( $e );
+		} catch ( \Throwable $e ) {
+			// The invoice is registered; only its human-readable number is missing.
+			$this->logger->warning(
+				'Could not read back the registered invoice number.',
+				[
+					'invoice_id' => $invoice_id,
+					'error'      => $e->getMessage(),
+				]
+			);
 		}
 
 		OrderMeta::set( $order, OrderMetaKeys::SALE_INVOICE_ID, $invoice_id );
@@ -159,13 +169,11 @@ class SaleInvoiceService {
 	 */
 	private function number_suffix( WC_Order $order ): string {
 
-		if ( $this->settings->use_wc_order_number() ) {
-			$suffix = (string) $order->get_order_number();
-		} else {
-			$suffix = (string) $order->get_id();
-		}
+		$raw = $this->settings->use_wc_order_number()
+			? (string) $order->get_order_number()
+			: (string) $order->get_id();
 
-		return \substr( $suffix, 0, 30 );
+		return InvoiceNumber::suffix( $raw, $order->get_id() );
 	}
 
 	/**

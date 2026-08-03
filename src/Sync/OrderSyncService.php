@@ -11,7 +11,11 @@ namespace Aanndryyyy\EFinancialsPlugin\Sync;
 
 use Aanndryyyy\EFinancialsPlugin\Api\ClientFactory;
 use Aanndryyyy\EFinancialsPlugin\Meta\OrderMetaKeys;
+use Aanndryyyy\EFinancialsPlugin\Support\ErrorMessage;
 use Aanndryyyy\EFinancialsPlugin\Support\Logger;
+use Aanndryyyy\EFinancialsPlugin\Support\OrderMeta;
+use Aanndryyyy\EFinancialsPlugin\Support\RetryState;
+use Aanndryyyy\EFinancialsPlugin\Support\SyncLock;
 use Throwable;
 use WC_Order;
 
@@ -65,6 +69,28 @@ class OrderSyncService {
 			return false;
 		}
 
+		if ( ! RetryState::is_due( $order ) ) {
+			$this->logger->info(
+				'Order sync skipped: backing off after repeated failures.',
+				[
+					'order_id' => $order_id,
+					'attempts' => RetryState::attempts( $order ),
+				]
+			);
+
+			return false;
+		}
+
+		$lock = 'order-' . $order_id;
+
+		// Action Scheduler does not de-duplicate against already-running jobs, so
+		// without this two runners can register two invoices for one order.
+		if ( ! SyncLock::acquire( $lock ) ) {
+			$this->logger->info( 'Order sync skipped: another run holds the lock.', [ 'order_id' => $order_id ] );
+
+			return false;
+		}
+
 		try {
 			$clients_id = $this->clients->upsert_for_order( $order );
 			$cash       = $this->payments->cash_fields_for_create( $order );
@@ -80,27 +106,39 @@ class OrderSyncService {
 			$this->payments->record_after_invoice( $order, $invoice_id, $clients_id );
 			$this->delivery->maybe_auto_deliver( $order, $invoice_id );
 
+			RetryState::clear( $order );
+			OrderMeta::set( $order, OrderMetaKeys::SYNC_COMPLETE, 1 );
+			$order->save();
+
 			return true;
 		} catch ( Throwable $e ) {
-			$order->update_meta_data( OrderMetaKeys::LAST_ERROR, $e->getMessage() );
+			$message = ErrorMessage::sanitize( $e->getMessage() );
+
+			// Only note a failure once per distinct message; the sweep retries for hours.
+			if ( RetryState::record_failure( $order, $message ) ) {
+				$order->add_order_note(
+					\sprintf(
+						/* translators: %s: error message */
+						__( 'e-Financials sync failed: %s', 'e-financials' ),
+						$message
+					)
+				);
+			}
+
 			$order->save();
-			$order->add_order_note(
-				\sprintf(
-					/* translators: %s: error message */
-					__( 'e-Financials sync failed: %s', 'e-financials' ),
-					$e->getMessage()
-				)
-			);
 
 			$this->logger->error(
 				'Order sync failed.',
 				[
 					'order_id' => $order_id,
+					'attempts' => RetryState::attempts( $order ),
 					'error'    => $e->getMessage(),
 				]
 			);
 
 			throw $e;
+		} finally {
+			SyncLock::release( $lock );
 		}
 	}
 }

@@ -45,9 +45,26 @@ class OrderColumns implements ServiceInterface {
 	 */
 	public function add_column( array $columns ): array {
 
-		$columns['ef_invoice'] = __( 'e-Financials', 'e-financials' );
+		$label = __( 'e-Financials', 'e-financials' );
 
-		return $columns;
+		// Insert before WooCommerce's actions column, which conventionally stays last.
+		if ( ! isset( $columns['wc_actions'] ) ) {
+			$columns['ef_invoice'] = $label;
+
+			return $columns;
+		}
+
+		$reordered = [];
+
+		foreach ( $columns as $key => $value ) {
+			if ( $key === 'wc_actions' ) {
+				$reordered['ef_invoice'] = $label;
+			}
+
+			$reordered[ $key ] = $value;
+		}
+
+		return $reordered;
 	}
 
 	/**

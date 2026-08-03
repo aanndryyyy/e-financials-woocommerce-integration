@@ -59,4 +59,20 @@ Sale invoices are created via the OpenAPI client, then registered. System PDFs c
 
 ### Invoice Series
 
-Choose invoice series + template in settings before the first sync. Optionally push the WooCommerce order number as `number_suffix`.
+Choose invoice series + template in settings before the first sync. The series' number prefix is sent as `number_prefix`, so invoices follow the accountant's numbering. Optionally push the WooCommerce order number as `number_suffix` — it is reduced to digits, because the API rejects non-numeric invoice numbers.
+
+### VAT
+
+Line VAT rates are read from WooCommerce's own tax rows; nothing is inferred from the tax/net ratio. e-Financials books VAT by *sale article*, not by the row's `vat_rate`, so a mixed-rate catalogue needs the **VAT rate → sale article map**. A sync fails loudly rather than posting tax into the wrong VAT-return bucket when a line's rate does not match its article.
+
+The default sale article is **required**: `products/create` is rejected with "Please select sales account or purchases account" without it.
+
+### Known limitation: refund credit invoices
+
+`sale_invoice_type=CREDIT_INVOICE` currently fails server-side on the demo tenant with
+`null value in column "number" of relation "sale_invoices" violates not-null constraint`,
+reproduced with a valid `number_prefix` and a numeric `number_suffix` (2026-08-03). The
+refund path is implemented and its amounts are unit-tested, but it cannot succeed until RIK
+resolves this or documents the `credit_invoices` / `credit_invoice_payment_type` fields.
+API error text is sanitised and truncated before it reaches an order note, so the raw
+server traceback is no longer shown to customers.

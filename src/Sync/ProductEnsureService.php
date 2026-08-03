@@ -10,9 +10,11 @@ declare(strict_types=1);
 namespace Aanndryyyy\EFinancialsPlugin\Sync;
 
 use Aanndryyyy\EFinancialsPlugin\Api\ClientFactory;
+use Aanndryyyy\EFinancialsPlugin\Api\RemoteLookup;
 use Aanndryyyy\EFinancialsPlugin\Meta\ProductMetaKeys;
 use Aanndryyyy\EFinancialsPlugin\Settings\SettingsRepository;
 use Aanndryyyy\EFinancialsPlugin\Support\Logger;
+use Aanndryyyy\EFinancialsPlugin\Support\TaxRates;
 use RuntimeException;
 use WC_Order;
 use WC_Order_Item_Fee;
@@ -35,11 +37,13 @@ class ProductEnsureService {
 	 * Provide arguments.
 	 *
 	 * @param ClientFactory      $client_factory API client factory.
+	 * @param RemoteLookup       $lookup         Cached API lookups.
 	 * @param SettingsRepository $settings       Settings.
 	 * @param Logger             $logger         Logger.
 	 */
 	public function __construct(
 		private readonly ClientFactory $client_factory,
+		private readonly RemoteLookup $lookup,
 		private readonly SettingsRepository $settings,
 		private readonly Logger $logger
 	) {
@@ -61,38 +65,19 @@ class ProductEnsureService {
 			return $existing;
 		}
 
-		$name = $product->get_name();
 		$sku  = $product->get_sku();
 		$code = $this->normalize_code( $sku !== '' ? $sku : 'WC-P' . $product->get_id() );
 
-		$params = [
-			'description'    => \wp_strip_all_tags( $product->get_short_description() !== '' ? $product->get_short_description() : $product->get_description() ),
-			'sales_price'    => (float) $product->get_regular_price(),
-			'price_currency' => \get_woocommerce_currency(),
-		];
+		$products_id = $this->find_or_create(
+			$code,
+			$product->get_name(),
+			[
+				'description'    => \wp_strip_all_tags( $product->get_short_description() !== '' ? $product->get_short_description() : $product->get_description() ),
+				'sales_price'    => (float) $product->get_regular_price(),
+				'price_currency' => \get_woocommerce_currency(),
+			]
+		);
 
-		$sale_article = $this->settings->sale_article_id();
-
-		if ( $sale_article > 0 ) {
-			$params['cl_sale_articles_id'] = $sale_article;
-		}
-
-		$client   = $this->client_factory->make();
-		$response = $client->products()->create( $name, $code, $params );
-
-		if ( ! $response->successful() || $response->createdObjectId === null ) {
-			// Retry with a unique code if code collision.
-			$code     = $this->normalize_code( 'WC-P' . $product->get_id() . '-' . \wp_generate_password( 4, false ) );
-			$response = $client->products()->create( $name, $code, $params );
-		}
-
-		if ( ! $response->successful() || $response->createdObjectId === null ) {
-			throw new RuntimeException(
-				'Failed to create e-Financials product: ' . \implode( '; ', $response->messages )
-			);
-		}
-
-		$products_id = (int) $response->createdObjectId;
 		$product->update_meta_data( ProductMetaKeys::PRODUCTS_ID, (string) $products_id );
 		$product->save();
 
@@ -136,18 +121,14 @@ class ProductEnsureService {
 				? $this->ensure_product( $product )
 				: $this->ensure_generic( self::CODE_GENERIC, 'WooCommerce line item' );
 
-			$net = (float) $item->get_total();
-			$tax = (float) $item->get_total_tax();
-
-			$items[] = [
-				'products_id'     => $products_id,
-				'amount'          => $qty,
-				'custom_title'    => $item->get_name(),
-				'unit_net_price'  => \round( $net / $qty, 4 ),
-				'total_net_price' => \round( $net, 4 ),
-				'vat_rate'        => $this->guess_vat_rate( $net, $tax ),
-				'vat_amount'      => \round( $tax, 4 ),
-			];
+			$items[] = $this->build_row(
+				$products_id,
+				$item->get_name(),
+				$qty,
+				(float) $item->get_total(),
+				(float) $item->get_total_tax(),
+				TaxRates::for_item( $item )
+			);
 		}
 
 		foreach ( $order->get_items( 'shipping' ) as $item ) {
@@ -162,15 +143,14 @@ class ProductEnsureService {
 				continue;
 			}
 
-			$items[] = [
-				'products_id'     => $this->ensure_generic( self::CODE_SHIPPING, 'WooCommerce shipping' ),
-				'amount'          => 1,
-				'custom_title'    => $item->get_name() !== '' ? $item->get_name() : 'Shipping',
-				'unit_net_price'  => \round( $net, 4 ),
-				'total_net_price' => \round( $net, 4 ),
-				'vat_rate'        => $this->guess_vat_rate( $net, $tax ),
-				'vat_amount'      => \round( $tax, 4 ),
-			];
+			$items[] = $this->build_row(
+				$this->ensure_generic( self::CODE_SHIPPING, 'WooCommerce shipping' ),
+				$item->get_name() !== '' ? $item->get_name() : 'Shipping',
+				1.0,
+				$net,
+				$tax,
+				TaxRates::for_item( $item )
+			);
 		}
 
 		foreach ( $order->get_items( 'fee' ) as $item ) {
@@ -178,34 +158,122 @@ class ProductEnsureService {
 				continue;
 			}
 
-			$net = (float) $item->get_total();
-			$tax = (float) $item->get_total_tax();
-
-			$items[] = [
-				'products_id'     => $this->ensure_generic( self::CODE_FEE, 'WooCommerce fee' ),
-				'amount'          => 1,
-				'custom_title'    => $item->get_name() !== '' ? $item->get_name() : 'Fee',
-				'unit_net_price'  => \round( $net, 4 ),
-				'total_net_price' => \round( $net, 4 ),
-				'vat_rate'        => $this->guess_vat_rate( $net, $tax ),
-				'vat_amount'      => \round( $tax, 4 ),
-			];
+			$items[] = $this->build_row(
+				$this->ensure_generic( self::CODE_FEE, 'WooCommerce fee' ),
+				$item->get_name() !== '' ? $item->get_name() : 'Fee',
+				1.0,
+				(float) $item->get_total(),
+				(float) $item->get_total_tax(),
+				TaxRates::for_item( $item )
+			);
 		}
 
 		if ( $items === [] ) {
 			throw new RuntimeException( 'Order has no invoiceable line items.' );
 		}
 
-		$sale_article = $this->settings->sale_article_id();
+		return $items;
+	}
 
-		if ( $sale_article > 0 ) {
-			foreach ( $items as &$row ) {
-				$row['cl_sale_articles_id'] = $sale_article;
-			}
-			unset( $row );
+	/**
+	 * Build one invoice row with a verified VAT rate and sale article.
+	 *
+	 * @param int    $products_id e-Financials product id.
+	 * @param string $title       Row title.
+	 * @param float  $qty         Quantity.
+	 * @param float  $net         Net amount for the whole row.
+	 * @param float  $tax         Tax amount for the whole row.
+	 * @param float  $vat_rate    VAT percentage read from WooCommerce.
+	 *
+	 * @return array<string, mixed>
+	 *
+	 * @throws RuntimeException When no matching sale article is configured.
+	 */
+	public function build_row( int $products_id, string $title, float $qty, float $net, float $tax, float $vat_rate ): array {
+
+		$qty = $qty > 0 ? $qty : 1.0;
+
+		return [
+			'products_id'         => $products_id,
+			'amount'              => $qty,
+			'custom_title'        => $title,
+			'unit_net_price'      => \round( $net / $qty, 4 ),
+			'total_net_price'     => \round( $net, 4 ),
+			'vat_rate'            => $vat_rate,
+			'vat_amount'          => \round( $tax, 4 ),
+			'cl_sale_articles_id' => $this->sale_article_for_rate( $vat_rate ),
+		];
+	}
+
+	/**
+	 * Resolve the sale article whose VAT rate matches the line.
+	 *
+	 * The API books VAT by the sale article, not by the row's vat_rate, so a
+	 * mismatch would silently land tax in the wrong VAT-return bucket.
+	 *
+	 * @param float $vat_rate VAT percentage.
+	 *
+	 * @throws RuntimeException When nothing is configured or the rates disagree.
+	 */
+	public function sale_article_for_rate( float $vat_rate ): int {
+
+		$sale_article = $this->settings->sale_article_for_rate( $vat_rate );
+
+		if ( $sale_article <= 0 ) {
+			throw new RuntimeException(
+				\sprintf(
+					/* translators: %s: VAT percentage */
+					__( 'No e-Financials sale article is configured for VAT %s%%. Set a default sale article or add the rate to the VAT rate map.', 'e-financials' ),
+					(string) $vat_rate
+				)
+			);
 		}
 
-		return $items;
+		$article_rate = $this->lookup->sale_article_vat_rate( $sale_article );
+
+		if ( $article_rate !== null && \abs( $article_rate - $vat_rate ) > 0.001 ) {
+			throw new RuntimeException(
+				\sprintf(
+					/* translators: 1: sale article id, 2: article VAT percentage, 3: order line VAT percentage */
+					__( 'Sale article #%1$d is VAT %2$s%% but the order line is VAT %3$s%%. Map this rate to a matching sale article; e-Financials books VAT by article.', 'e-financials' ),
+					$sale_article,
+					(string) $article_rate,
+					(string) $vat_rate
+				)
+			);
+		}
+
+		return $sale_article;
+	}
+
+	/**
+	 * Shared catalogue entry used for shipping rows.
+	 *
+	 * @throws RuntimeException On API failure.
+	 */
+	public function ensure_shipping_id(): int {
+
+		return $this->ensure_generic( self::CODE_SHIPPING, 'WooCommerce shipping' );
+	}
+
+	/**
+	 * Shared catalogue entry used for fee rows.
+	 *
+	 * @throws RuntimeException On API failure.
+	 */
+	public function ensure_fee_id(): int {
+
+		return $this->ensure_generic( self::CODE_FEE, 'WooCommerce fee' );
+	}
+
+	/**
+	 * Shared catalogue entry used for unlinked / synthetic rows.
+	 *
+	 * @throws RuntimeException On API failure.
+	 */
+	public function ensure_generic_line_id(): int {
+
+		return $this->ensure_generic( self::CODE_GENERIC, 'WooCommerce line item' );
 	}
 
 	/**
@@ -218,6 +286,7 @@ class ProductEnsureService {
 	 */
 	private function ensure_generic( string $code, string $name ): int {
 
+		$code       = $this->normalize_code( $code );
 		$option_key = 'ef_generic_products_id_' . \sanitize_key( $code );
 		$cached_raw = \get_option( $option_key, 0 );
 		$cached     = \is_numeric( $cached_raw ) ? (int) $cached_raw : 0;
@@ -226,30 +295,66 @@ class ProductEnsureService {
 			return $cached;
 		}
 
-		$client       = $this->client_factory->make();
-		$params       = [
-			'price_currency' => \get_woocommerce_currency(),
-		];
-		$sale_article = $this->settings->sale_article_id();
+		$products_id = $this->find_or_create(
+			$code,
+			$name,
+			[ 'price_currency' => \get_woocommerce_currency() ]
+		);
 
-		if ( $sale_article > 0 ) {
-			$params['cl_sale_articles_id'] = $sale_article;
-		}
-
-		$response = $client->products()->create( $name, $this->normalize_code( $code ), $params );
-
-		if ( ! $response->successful() || $response->createdObjectId === null ) {
-			// Likely already exists — store a synthetic lookup via create with unique suffix is avoided;
-			// rethrow so the job retries after admin fixes catalogue conflicts.
-			throw new RuntimeException(
-				'Failed to create generic e-Financials product ' . $code . ': ' . \implode( '; ', $response->messages )
-			);
-		}
-
-		$products_id = (int) $response->createdObjectId;
 		\update_option( $option_key, $products_id, false );
 
 		return $products_id;
+	}
+
+	/**
+	 * Link an existing catalogue entry by code, or create it.
+	 *
+	 * Product codes are unique tenant-wide, so a failed create is resolved by
+	 * looking the code up — never by inventing a suffixed duplicate.
+	 *
+	 * @param string               $code   Catalogue code.
+	 * @param string               $name   Product name.
+	 * @param array<string, mixed> $params Additional create parameters.
+	 *
+	 * @throws RuntimeException On API failure or missing configuration.
+	 */
+	private function find_or_create( string $code, string $name, array $params ): int {
+
+		$found = $this->lookup->product_id_by_code( $code );
+
+		if ( $found !== null && $found > 0 ) {
+			return $found;
+		}
+
+		$sale_article = $this->settings->sale_article_id();
+
+		if ( $sale_article <= 0 ) {
+			throw new RuntimeException(
+				__( 'e-Financials requires a default sale article before products can be created. Set it in the integration settings.', 'e-financials' )
+			);
+		}
+
+		$params['cl_sale_articles_id'] = $sale_article;
+
+		$response = $this->client_factory->make()->products()->create( $name, $code, $params );
+
+		if ( $response->successful() && $response->createdObjectId !== null ) {
+			$this->lookup->flush();
+
+			return (int) $response->createdObjectId;
+		}
+
+		// A create can lose a race, or the code can pre-date this site: re-scan before failing.
+		$this->lookup->flush();
+		$found = $this->lookup->product_id_by_code( $code );
+
+		if ( $found !== null && $found > 0 ) {
+			return $found;
+		}
+
+		throw new RuntimeException(
+			'Failed to create e-Financials product ' . $code . ': ' . \implode( '; ', $response->messages )
+		);
 	}
 
 	/**
@@ -257,34 +362,11 @@ class ProductEnsureService {
 	 *
 	 * @param string $code Raw code.
 	 */
-	private function normalize_code( string $code ): string {
+	public function normalize_code( string $code ): string {
 
 		$code = \preg_replace( '/[^A-Za-z0-9\-_]/', '', $code ) ?? 'WC-ITEM';
 		$code = \substr( $code, 0, 20 );
 
 		return $code !== '' ? $code : 'WC-ITEM';
-	}
-
-	/**
-	 * Guess VAT percent from net and tax amounts.
-	 *
-	 * @param float $net Net amount.
-	 * @param float $tax Tax amount.
-	 */
-	private function guess_vat_rate( float $net, float $tax ): float {
-
-		if ( $net <= 0.0 || $tax <= 0.0 ) {
-			return 0.0;
-		}
-
-		$rate = \round( ( $tax / $net ) * 100, 2 );
-
-		foreach ( [ 0.0, 5.0, 9.0, 20.0, 22.0, 24.0 ] as $known ) {
-			if ( \abs( $rate - $known ) < 0.6 ) {
-				return $known;
-			}
-		}
-
-		return $rate;
 	}
 }
