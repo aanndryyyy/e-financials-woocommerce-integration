@@ -2,7 +2,7 @@
 Contributors: aanndryyyy
 Tags: accounting, invoices, bookkeeping, estonia, e-arveldaja
 Requires at least: 6.0
-Tested up to: 6.8
+Tested up to: 7.0
 Requires PHP: 8.2
 Stable tag: 0.0.1
 License: GPLv2 or later
