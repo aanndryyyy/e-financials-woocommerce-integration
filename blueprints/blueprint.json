@@ -1,0 +1,30 @@
+{
+	"$schema": "https://playground.wordpress.net/blueprint-schema.json",
+	"landingPage": "/wp-admin/admin.php?page=wc-settings&tab=integration&section=efinancials_integration",
+	"login": true,
+	"preferredVersions": {
+		"php": "8.2",
+		"wp": "latest"
+	},
+	"features": {
+		"networking": true
+	},
+	"plugins": [
+		"woocommerce",
+		"https://raw.githubusercontent.com/aanndryyyy/e-financials-woocommerce-integration/playground-builds/main.zip"
+	],
+	"steps": [
+		{
+			"step": "runPHP",
+			"code": "<?php\ninclude_once 'wordpress/wp-load.php';\n\n// Skip the WooCommerce onboarding wizard and the setup task list.\ndelete_transient( '_wc_activation_redirect' );\nupdate_option( 'woocommerce_onboarding_profile', array( 'completed' => true, 'skipped' => true ) );\nupdate_option( 'woocommerce_task_list_hidden', 'yes' );\nupdate_option( 'woocommerce_task_list_appearance_hidden', 'yes' );\nupdate_option( 'woocommerce_admin_notices', array() );\n\n// Let visitors reach the storefront instead of the \"coming soon\" page.\nupdate_option( 'woocommerce_coming_soon', 'no' );\n\n// An Estonian store, so the plugin's invoice and VAT paths have sane values.\nupdate_option( 'blogname', 'e-Financials Demo Store' );\nupdate_option( 'woocommerce_store_address', 'Tartu mnt 1' );\nupdate_option( 'woocommerce_store_city', 'Tallinn' );\nupdate_option( 'woocommerce_store_postcode', '10145' );\nupdate_option( 'woocommerce_default_country', 'EE' );\nupdate_option( 'woocommerce_currency', 'EUR' );\nupdate_option( 'woocommerce_calc_taxes', 'yes' );\nupdate_option( 'woocommerce_prices_include_tax', 'yes' );\nupdate_option( 'woocommerce_enable_guest_checkout', 'yes' );\n\nWC_Tax::_insert_tax_rate( array(\n\t'tax_rate_country'  => 'EE',\n\t'tax_rate'          => '22.0000',\n\t'tax_rate_name'     => 'KM',\n\t'tax_rate_priority' => 1,\n\t'tax_rate_shipping' => 1,\n\t'tax_rate_class'    => '',\n) );\n"
+		},
+		{
+			"step": "runPHP",
+			"code": "<?php\ninclude_once 'wordpress/wp-load.php';\n\n// Demo catalogue.\n$catalogue = array(\n\tarray( 'Raamatupidamise kiirkursus', 'EF-COURSE', '149.00', 'Ühepäevane kursus e-Arveldaja kasutajatele.' ),\n\tarray( 'Beanie', 'EF-BEANIE', '18.00', 'Warm demo beanie.' ),\n\tarray( 'Hoodie', 'EF-HOODIE', '45.00', 'Demo hoodie with a logo.' ),\n\tarray( 'Sunglasses', 'EF-SUNGLASSES', '90.00', 'Demo sunglasses.' ),\n\tarray( 'Cap', 'EF-CAP', '16.00', 'Demo cap.' ),\n\tarray( 'Belt', 'EF-BELT', '55.00', 'Demo leather belt.' ),\n);\n\n$product_ids = array();\n\nforeach ( $catalogue as $item ) {\n\tlist( $name, $sku, $price, $description ) = $item;\n\n\t$product = new WC_Product_Simple();\n\t$product->set_name( $name );\n\t$product->set_sku( $sku );\n\t$product->set_regular_price( $price );\n\t$product->set_description( $description );\n\t$product->set_short_description( $description );\n\t$product->set_catalog_visibility( 'visible' );\n\t$product->set_tax_status( 'taxable' );\n\t$product->set_status( 'publish' );\n\t$product_ids[] = $product->save();\n}\n\nupdate_option( 'ef_demo_product_ids', $product_ids );\n"
+		},
+		{
+			"step": "runPHP",
+			"code": "<?php\ninclude_once 'wordpress/wp-load.php';\n\n$product_ids = get_option( 'ef_demo_product_ids', array() );\n\nif ( empty( $product_ids ) ) {\n\treturn;\n}\n\n$customer_id = username_exists( 'demo_customer' );\n\nif ( ! $customer_id ) {\n\t$customer_id = wc_create_new_customer( 'kadri@example.com', 'demo_customer', 'demo-password' );\n}\n\n$address = array(\n\t'first_name' => 'Kadri',\n\t'last_name'  => 'Tamm',\n\t'company'    => 'Näidis OÜ',\n\t'email'      => 'kadri@example.com',\n\t'phone'      => '+372 5555 0100',\n\t'address_1'  => 'Pärnu mnt 12',\n\t'city'       => 'Tallinn',\n\t'postcode'   => '10148',\n\t'country'    => 'EE',\n);\n\n$demo_orders = array(\n\tarray( 'completed', array( 0 => 1, 2 => 2 ) ),\n\tarray( 'processing', array( 1 => 3, 4 => 1 ) ),\n\tarray( 'on-hold', array( 3 => 1 ) ),\n);\n\nforeach ( $demo_orders as $demo_order ) {\n\tlist( $status, $lines ) = $demo_order;\n\n\t$order = wc_create_order( array( 'customer_id' => is_wp_error( $customer_id ) ? 0 : $customer_id ) );\n\n\tforeach ( $lines as $index => $quantity ) {\n\t\tif ( ! isset( $product_ids[ $index ] ) ) {\n\t\t\tcontinue;\n\t\t}\n\n\t\t$product = wc_get_product( $product_ids[ $index ] );\n\n\t\tif ( $product ) {\n\t\t\t$order->add_product( $product, $quantity );\n\t\t}\n\t}\n\n\t$order->set_address( $address, 'billing' );\n\t$order->set_address( $address, 'shipping' );\n\t$order->set_payment_method_title( 'Bank transfer' );\n\t$order->calculate_totals();\n\t$order->update_status( $status, 'Demo order created by the Playground blueprint.' );\n}\n\ndelete_option( 'ef_demo_product_ids' );\n"
+		}
+	]
+}

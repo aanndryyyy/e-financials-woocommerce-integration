@@ -87,3 +87,27 @@ govern it, all verified end-to-end against the demo tenant (2026-08-03):
 Over-crediting is refused per row with a 409, and voiding a credit does not give the
 capacity back. API error text is sanitised and truncated before it reaches an order note,
 so the raw server traceback is never shown to customers.
+
+## Demo in WordPress Playground
+
+Every pull request gets a one-click, throwaway demo of that branch in
+[WordPress Playground](https://developer.woocommerce.com/2025/01/24/demo-your-woo-extension-with-wordpress-playground/):
+WordPress runs in the browser via WebAssembly, with WooCommerce, this plugin, demo products,
+a customer and three orders in different states. The store is seeded as an Estonian shop
+(EUR, 22% VAT) and the WooCommerce setup wizard is skipped, so the demo lands directly on the
+e-Financials integration settings.
+
+- `blueprints/blueprint.json` — the Playground blueprint (site setup + demo data). Edited by
+  hand; the trunk build is pinned to `playground-builds/main.zip`.
+- `.github/workflows/playground.yml` — builds the plugin zip (with `vendor/`, without dev
+  files), publishes it to the orphan `playground-builds` branch, and comments the demo link
+  on the pull request.
+
+The zip is served from `raw.githubusercontent.com` because Playground fetches it from the
+browser and that host sends `access-control-allow-origin: *`. `playground.wordpress.net`'s
+own `plugin-proxy` is not an option here — it only allowlists the `wordpress`, `automattic`
+and `woocommerce` organisations.
+
+**No e-Financials API calls happen in Playground.** The plugin talks to the API over Guzzle,
+which does not reach the network from WebAssembly, so the demo covers the admin UI, settings
+and order screens — not live syncing.

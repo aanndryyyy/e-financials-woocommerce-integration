@@ -1,0 +1,183 @@
+name: Playground
+
+# Builds an installable plugin zip and publishes it to the orphan
+# `playground-builds` branch, which raw.githubusercontent.com serves with
+# `access-control-allow-origin: *` — the only requirement for WordPress
+# Playground to fetch it from the browser. (playground.wordpress.net's
+# plugin-proxy is not usable here: it only allowlists the wordpress,
+# automattic and woocommerce organisations.)
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  PLUGIN_SLUG: e-financials-woocommerce-integration
+  BUILDS_BRANCH: playground-builds
+
+jobs:
+  build:
+    name: Build Playground demo
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          tools: composer:v2
+          coverage: none
+
+      - name: Install Dependencies
+        uses: nick-fields/retry@v4
+        with:
+          timeout_minutes: 5
+          max_attempts: 2
+          command: composer install --no-dev --no-interaction --no-progress --optimize-autoloader
+
+      - name: Assemble plugin directory
+        run: |
+          mkdir -p build/${PLUGIN_SLUG}
+          rsync -a --exclude-from=- ./ build/${PLUGIN_SLUG}/ <<'EOF'
+          /.git/
+          /.github/
+          /.devcontainer/
+          /.cursor/
+          /.vscode/
+          /.omc/
+          /build/
+          /blueprints/
+          /docs/
+          /node_modules/
+          /tests/
+          /vendor-bin/
+          /.env
+          /.wp-env.json
+          /package.json
+          /package-lock.json
+          /phpcs.xml.dist
+          /phpstan.neon.dist
+          /phpunit.xml.dist
+          /psalm.xml.dist
+          EOF
+
+      - name: Determine build name
+        id: build
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "name=pr-${{ github.event.number }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "name=main" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create plugin zip
+        run: cd build && zip -qr "${{ steps.build.outputs.name }}.zip" ${PLUGIN_SLUG}
+
+      - name: Upload plugin zip as a workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: plugin-zip
+          path: build/${{ steps.build.outputs.name }}.zip
+          if-no-files-found: error
+
+      - name: Publish the zip to the builds branch
+        id: publish
+        run: |
+          ZIP="${{ steps.build.outputs.name }}.zip"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          rm -rf "$RUNNER_TEMP/builds"
+          if git ls-remote --exit-code --heads origin "$BUILDS_BRANCH"; then
+            git clone --depth 1 --branch "$BUILDS_BRANCH" \
+              "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" \
+              "$RUNNER_TEMP/builds"
+          else
+            git clone --depth 1 \
+              "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" \
+              "$RUNNER_TEMP/builds"
+            git -C "$RUNNER_TEMP/builds" checkout --orphan "$BUILDS_BRANCH"
+            git -C "$RUNNER_TEMP/builds" rm -rqf .
+          fi
+
+          cp "build/$ZIP" "$RUNNER_TEMP/builds/$ZIP"
+          cd "$RUNNER_TEMP/builds"
+          git add "$ZIP"
+          git commit -qm "build: $ZIP from ${{ github.sha }}"
+          git push -q origin "HEAD:$BUILDS_BRANCH"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Comment the Playground link on the pull request
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        env:
+          ZIP_URL: https://raw.githubusercontent.com/${{ github.repository }}/${{ steps.publish.outputs.sha }}/${{ steps.build.outputs.name }}.zip
+        with:
+          script: |
+            const fs = require('fs');
+            const blueprint = JSON.parse(
+              fs.readFileSync('blueprints/blueprint.json', 'utf8')
+            );
+
+            // Swap the trunk build for this pull request's build.
+            blueprint.plugins = blueprint.plugins.map( ( plugin ) =>
+              typeof plugin === 'string' && plugin.endsWith( '.zip' )
+                ? process.env.ZIP_URL
+                : plugin
+            );
+
+            const url =
+              'https://playground.wordpress.net/#' +
+              encodeURIComponent( JSON.stringify( blueprint ) );
+
+            const marker = '<!-- playground-preview -->';
+            const body = [
+              marker,
+              '### :rocket: Try this pull request in WordPress Playground',
+              '',
+              `[**Launch the demo**](${url})`,
+              '',
+              'A throwaway WordPress runs in your browser with WooCommerce, this ' +
+              'branch\'s build of the plugin, demo products, a customer and three ' +
+              'orders in different states. The store is set up as an Estonian shop ' +
+              '(EUR, 22% VAT) and the setup wizard is skipped, so you land straight ' +
+              'on the e-Financials integration settings.',
+              '',
+              'Nothing leaves your browser and no e-Financials API calls are made, ' +
+              'so the demo covers the admin UI, settings and order screens — not ' +
+              'live syncing.',
+              '',
+              `<sub>Build: [\`${ process.env.ZIP_URL.split('/').pop() }\`](${ process.env.ZIP_URL }) from ${ context.sha.slice( 0, 7 ) }</sub>`,
+            ].join('\n');
+
+            const comments = await github.rest.issues.listComments({
+              ...context.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.data.find(
+              ( comment ) => comment.body && comment.body.includes( marker )
+            );
+
+            if ( existing ) {
+              await github.rest.issues.updateComment({
+                ...context.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                ...context.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
