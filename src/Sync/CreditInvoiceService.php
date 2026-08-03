@@ -14,11 +14,13 @@ use Aanndryyyy\EFinancialsPlugin\Api\RemoteLookup;
 use Aanndryyyy\EFinancialsPlugin\Meta\OrderMetaKeys;
 use Aanndryyyy\EFinancialsPlugin\Settings\SettingsRepository;
 use Aanndryyyy\EFinancialsPlugin\Support\CountryCodes;
+use Aanndryyyy\EFinancialsPlugin\Support\CreditRow;
 use Aanndryyyy\EFinancialsPlugin\Support\InvoiceNumber;
 use Aanndryyyy\EFinancialsPlugin\Support\Logger;
 use Aanndryyyy\EFinancialsPlugin\Support\OrderMeta;
 use Aanndryyyy\EFinancialsPlugin\Support\RefundAmounts;
 use Aanndryyyy\EFinancialsPlugin\Support\TaxRates;
+use EFinancialsClient\Enums\SaleInvoiceType;
 use RuntimeException;
 use WC_Order;
 use WC_Order_Item_Fee;
@@ -88,15 +90,15 @@ class CreditInvoiceService {
 		$refund_date = $refund->get_date_created();
 		$date        = $refund_date instanceof \WC_DateTime ? $refund_date->date( 'Y-m-d' ) : \gmdate( 'Y-m-d' );
 		$items       = $this->build_credit_items( $order, $refund );
+		$prefix      = $this->lookup->series_number_prefix( $this->settings->invoice_series_id() );
 
 		$payload = [
-			'sale_invoice_type'       => SaleInvoiceService::TYPE_CREDIT_INVOICE,
+			'sale_invoice_type'       => SaleInvoiceType::CREDIT_INVOICE->value,
 			'credit_sale_invoices_id' => $original_id,
 			'cl_templates_id'         => $template_id,
 			'clients_id'              => $clients_id,
 			'cl_countries_id'         => CountryCodes::to_alpha3( $order->get_billing_country() ),
-			// The API rejects non-numeric invoice numbers; the refund id is unique on its own.
-			'number_suffix'           => InvoiceNumber::suffix( (string) $refund->get_id(), $refund->get_id() ),
+			'number_suffix'           => $this->original_suffix( $order, $prefix ),
 			'create_date'             => $date,
 			'journal_date'            => $date,
 			'term_days'               => $this->settings->term_days(),
@@ -105,8 +107,6 @@ class CreditInvoiceService {
 			'notes'                   => 'WooCommerce refund #' . $refund->get_id() . ' for order #' . $order->get_order_number(),
 			'items'                   => $items,
 		];
-
-		$prefix = $this->lookup->series_number_prefix( $this->settings->invoice_series_id() );
 
 		if ( $prefix !== '' ) {
 			$payload['number_prefix'] = $prefix;
@@ -172,11 +172,57 @@ class CreditInvoiceService {
 
 		$items = $this->build_itemised_credit( $refund );
 
-		if ( $items !== [] ) {
-			return $items;
+		if ( $items === [] ) {
+			$items = [ $this->build_amount_only_credit( $order, $refund ) ];
 		}
 
-		return [ $this->build_amount_only_credit( $order, $refund ) ];
+		return \array_map( [ CreditRow::class, 'negate' ], $items );
+	}
+
+	/**
+	 * Suffix of the order's original sale invoice.
+	 *
+	 * The credit repeats the original's suffix and the server derives the credit
+	 * number itself by appending K, then K2, K3, … per further partial credit.
+	 *
+	 * Prefers the number the server actually assigned, so the credit still
+	 * matches after a settings change; falls back to recomputing it the same
+	 * way SaleInvoiceService does.
+	 *
+	 * The fallback is never fatal: the credit is linked to its original by
+	 * `credit_sale_invoices_id`, so an unrecoverable suffix costs a tidy number,
+	 * not a correct booking. Throwing here would push a permanent condition into
+	 * the retry backoff, where it could never drain.
+	 *
+	 * @param WC_Order $order  Parent order.
+	 * @param string   $prefix Series number prefix.
+	 */
+	private function original_suffix( WC_Order $order, string $prefix ): string {
+
+		$number = OrderMeta::get_string( $order, OrderMetaKeys::SALE_INVOICE_NUMBER );
+
+		if ( $number !== '' ) {
+			$suffix = InvoiceNumber::suffix_from_number( $number, $prefix );
+
+			if ( $suffix !== '' ) {
+				return $suffix;
+			}
+
+			$this->logger->warning(
+				'Original invoice number does not match the configured series; recomputing the credit suffix.',
+				[
+					'order_id' => $order->get_id(),
+					'number'   => $number,
+					'prefix'   => $prefix,
+				]
+			);
+		}
+
+		$raw = $this->settings->use_wc_order_number()
+			? (string) $order->get_order_number()
+			: (string) $order->get_id();
+
+		return InvoiceNumber::suffix( $raw, $order->get_id() );
 	}
 
 	/**

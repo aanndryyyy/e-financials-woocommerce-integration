@@ -17,6 +17,7 @@ use Aanndryyyy\EFinancialsPlugin\Support\CountryCodes;
 use Aanndryyyy\EFinancialsPlugin\Support\InvoiceNumber;
 use Aanndryyyy\EFinancialsPlugin\Support\Logger;
 use Aanndryyyy\EFinancialsPlugin\Support\OrderMeta;
+use EFinancialsClient\Enums\SaleInvoiceType;
 use RuntimeException;
 use WC_Order;
 
@@ -24,10 +25,6 @@ use WC_Order;
  * Sale invoice create + register.
  */
 class SaleInvoiceService {
-
-	public const TYPE_INVOICE = 'INVOICE';
-
-	public const TYPE_CREDIT_INVOICE = 'CREDIT_INVOICE';
 
 	/**
 	 * Provide arguments.
@@ -75,7 +72,7 @@ class SaleInvoiceService {
 
 		$payload = \array_merge(
 			[
-				'sale_invoice_type'   => self::TYPE_INVOICE,
+				'sale_invoice_type'   => SaleInvoiceType::INVOICE->value,
 				'cl_templates_id'     => $template_id,
 				'clients_id'          => $clients_id,
 				'cl_countries_id'     => CountryCodes::to_alpha3( $order->get_billing_country() ),

@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "e60acae53668381a3b5afe9d5997fb1b",
+    "content-hash": "edcc79316ace919ac89c2cbbdadbbe8b",
     "packages": [
         {
             "name": "e-financials/php-client",
@@ -12,12 +12,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/aanndryyyy/e-financials-php-client.git",
-                "reference": "7dc2cb7dd8aec70c6b54b394ec029b13af55d01d"
+                "reference": "1c8e2a6c244836f4d48a033da8603645b7394dae"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/aanndryyyy/e-financials-php-client/zipball/7dc2cb7dd8aec70c6b54b394ec029b13af55d01d",
-                "reference": "7dc2cb7dd8aec70c6b54b394ec029b13af55d01d",
+                "url": "https://api.github.com/repos/aanndryyyy/e-financials-php-client/zipball/1c8e2a6c244836f4d48a033da8603645b7394dae",
+                "reference": "1c8e2a6c244836f4d48a033da8603645b7394dae",
                 "shasum": ""
             },
             "require": {
@@ -108,7 +108,7 @@
                 "source": "https://github.com/aanndryyyy/e-financials-php-client/tree/main",
                 "issues": "https://github.com/aanndryyyy/e-financials-php-client/issues"
             },
-            "time": "2026-08-02T15:52:33+00:00"
+            "time": "2026-08-03T08:05:58+00:00"
         },
         {
             "name": "guzzlehttp/guzzle",

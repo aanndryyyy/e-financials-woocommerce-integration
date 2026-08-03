@@ -48,4 +48,36 @@ final class InvoiceNumberTest extends TestCase {
 
 		$this->assertSame( '42', InvoiceNumber::suffix( 'ORD-0042', 7 ) );
 	}
+
+	/**
+	 * A credit invoice reuses the original's suffix, stripped of the series prefix.
+	 */
+	public function test_suffix_is_recovered_from_a_stored_number(): void {
+
+		$this->assertSame( '1042', InvoiceNumber::suffix_from_number( 'ARB-1042', 'ARB-' ) );
+	}
+
+	/**
+	 * Digits inside the prefix are not mistaken for the suffix.
+	 */
+	public function test_digits_in_the_prefix_are_stripped_with_it(): void {
+
+		$this->assertSame( '1042', InvoiceNumber::suffix_from_number( '2026-1042', '2026-' ) );
+	}
+
+	/**
+	 * A number from another series is refused rather than mis-stripped.
+	 */
+	public function test_number_without_the_current_prefix_is_refused(): void {
+
+		$this->assertSame( '', InvoiceNumber::suffix_from_number( '2026-1042', 'ARB-' ) );
+	}
+
+	/**
+	 * A missing stored number yields nothing, so the caller can fall back.
+	 */
+	public function test_empty_number_yields_empty_suffix(): void {
+
+		$this->assertSame( '', InvoiceNumber::suffix_from_number( '', 'ARB-' ) );
+	}
 }

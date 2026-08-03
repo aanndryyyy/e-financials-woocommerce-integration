@@ -67,12 +67,23 @@ Line VAT rates are read from WooCommerce's own tax rows; nothing is inferred fro
 
 The default sale article is **required**: `products/create` is rejected with "Please select sales account or purchases account" without it.
 
-### Known limitation: refund credit invoices
+### Refund credit invoices
 
-`sale_invoice_type=CREDIT_INVOICE` currently fails server-side on the demo tenant with
-`null value in column "number" of relation "sale_invoices" violates not-null constraint`,
-reproduced with a valid `number_prefix` and a numeric `number_suffix` (2026-08-03). The
-refund path is implemented and its amounts are unit-tested, but it cannot succeed until RIK
-resolves this or documents the `credit_invoices` / `credit_invoice_payment_type` fields.
-API error text is sanitised and truncated before it reaches an order note, so the raw
-server traceback is no longer shown to customers.
+A refund posts a credit sale invoice linked to the original. Three undocumented API rules
+govern it, all verified end-to-end against the demo tenant (2026-08-03):
+
+- `sale_invoice_type` comes from `EFinancialsClient\Enums\SaleInvoiceType`, which spells the
+  value the server actually branches on — hyphenated `CREDIT-INVOICE`. The field is neither
+  documented nor validated, so any other spelling skips the credit branch, the credit number
+  is never derived, and the request dies with HTTP 500 (`null value in column "number"`). An
+  earlier revision of this plugin sent `CREDIT_INVOICE`, which is what that 500 was; it is
+  not a server bug.
+- The credit repeats the **original's** `number_suffix`. The server derives the number
+  itself by appending `K` — and `K2`, `K3`, … for further partial credits against the same
+  original, so multiple partial refunds are safe.
+- The credited quantity carries the sign: `amount` is negative, `unit_net_price` positive.
+  The server recomputes the row and invoice totals as negative.
+
+Over-crediting is refused per row with a 409, and voiding a credit does not give the
+capacity back. API error text is sanitised and truncated before it reaches an order note,
+so the raw server traceback is never shown to customers.
