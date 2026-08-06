@@ -366,7 +366,10 @@ class EFinancialsIntegration extends \WC_Integration {
 				'[e-financials] Failed to load ' . $bucket . ' options: ' . $e->getMessage()
 			);
 
-			return $blank + [ '' => __( 'Could not load options — check credentials and the error log', 'e-financials' ) ];
+			// Replaces the blank entry rather than joining it: both would use the
+			// '' key, and an array union keeps the left-hand one, so the merchant
+			// would be left staring at an empty dropdown with no explanation.
+			return [ '' => __( 'Could not load options — check credentials and the error log', 'e-financials' ) ];
 		}
 
 		\set_transient( self::OPTIONS_TRANSIENT_PREFIX . $bucket, $options, self::OPTIONS_TRANSIENT_TTL );
