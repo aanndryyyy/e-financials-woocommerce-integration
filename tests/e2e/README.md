@@ -33,6 +33,18 @@ Optional demo catalog:
 npm run import:demo
 ```
 
+## Live demo API tests
+
+`specs/live-demo-api.spec.js` (`@live`) exercises a real connection to `demo-rmp-api.rik.ee`. Run with `npm run test:e2e:live` (excluded from default `npm run test:e2e`). It skips when secrets are missing; when secrets are present it fails if RIK rejects auth.
+
+Required env (Cursor Cloud Secrets):
+
+- `E_FINANCIALS_API_KEY_ID` (or `EFINANCIALS_API_KEY_ID`)
+- `E_FINANCIALS_API_KEY_PUBLIC` (or `EFINANCIALS_API_KEY_PUBLIC`)
+- `E_FINANCIALS_API_KEY_PASSWORD` (or `EFINANCIALS_API_KEY_PASSWORD`)
+
+Ensure the ApiKey IP allowlist permits the runner’s egress IP (or `0.0.0.0/0`).
+
 ## Layout
 
 ```

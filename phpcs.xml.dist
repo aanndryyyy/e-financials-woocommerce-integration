@@ -2,16 +2,32 @@
 <ruleset name="WordPress Coding Standards">
 	<description>Sniffs for WordPress plugin</description>
 
-	<config name="testVersion" value="8.0-"/>
+	<config name="testVersion" value="8.2-"/>
 
 	<rule ref="WordPress">
 		<exclude name="WordPress.Files.FileName.NotHyphenatedLowercase"/>
 		<exclude name="WordPress.Files.FileName.InvalidClassFileName"/>
 		<exclude name="Universal.Arrays.DisallowShortArraySyntax.Found"/>
 		<exclude name="WordPress.PHP.YodaConditions.NotYoda"/>
+		<!-- e-financials/php-client exposes camelCase DTO properties. -->
+		<exclude name="WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase"/>
+		<!-- Exception messages are not HTML output. -->
+		<exclude name="WordPress.Security.EscapeOutput.ExceptionNotEscaped"/>
+		<!-- Action Scheduler / retry sweep intentionally runs every 5 minutes;
+			 orders that keep failing back off exponentially (see RetryState). -->
+		<exclude name="WordPress.WP.CronInterval.CronSchedulesInterval"/>
 	</rule>
 
 	<config name="text_domain" value="e-financials"/>
+
+	<rule ref="WordPress.WP.Capabilities">
+		<properties>
+			<property name="custom_capabilities" type="array">
+				<element value="manage_woocommerce"/>
+				<element value="edit_shop_orders"/>
+			</property>
+		</properties>
+	</rule>
 
 	<arg value="ps"/>
 	<arg name="extensions" value="php"/>

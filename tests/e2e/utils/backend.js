@@ -3,8 +3,27 @@
  * Keep admin flows here so specs stay concise and self-contained.
  */
 
+const { execFileSync } = require( 'child_process' );
+
 const ADMIN_USER = process.env.WP_ADMIN_USER || 'admin';
 const ADMIN_PASSWORD = process.env.WP_ADMIN_PASSWORD || 'password';
+
+/**
+ * Evaluate PHP inside the wp-env container and return its stdout.
+ *
+ * For the handful of assertions that live below the admin UI (queued jobs,
+ * stored settings) and would otherwise need a plugin-side test endpoint.
+ *
+ * @param {string} php PHP source to evaluate.
+ * @return {string} Raw stdout.
+ */
+function wpEval( php ) {
+	return execFileSync( 'npx', [ 'wp-env', 'run', 'cli', 'wp', 'eval', php ], {
+		cwd: process.cwd(),
+		stdio: 'pipe',
+		encoding: 'utf8',
+	} );
+}
 
 /**
  * Log in to WP Admin. Safe to call when already logged in.
@@ -36,9 +55,35 @@ async function openEFinancialsSettings( page ) {
 	);
 }
 
+/**
+ * Assert settings form saved (success and/or connection ping notice).
+ *
+ * @param {import('@playwright/test').Page} page
+ */
+async function expectSettingsSaved( page ) {
+	await expectNotice(
+		page,
+		/Your settings have been saved|e-Financials connection (OK|failed)/i
+	);
+}
+
+/**
+ * @param {import('@playwright/test').Page} page
+ * @param {RegExp|string} text
+ */
+async function expectNotice( page, text ) {
+	const { expect } = require( '@playwright/test' );
+	await expect( page.locator( '#message, .updated, .error, .notice' ).filter( { hasText: text } ).first() ).toBeVisible( {
+		timeout: 20_000,
+	} );
+}
+
 module.exports = {
+	wpEval,
 	loginAsAdmin,
 	openEFinancialsSettings,
+	expectSettingsSaved,
+	expectNotice,
 	ADMIN_USER,
 	ADMIN_PASSWORD,
 };
