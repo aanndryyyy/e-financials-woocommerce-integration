@@ -4,20 +4,20 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "edcc79316ace919ac89c2cbbdadbbe8b",
+    "content-hash": "cce57f421476c947bf8442279344eca6",
     "packages": [
         {
-            "name": "e-financials/php-client",
-            "version": "dev-main",
+            "name": "aanndryyyy/e-financials-php-client",
+            "version": "v0.1.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/aanndryyyy/e-financials-php-client.git",
-                "reference": "1c8e2a6c244836f4d48a033da8603645b7394dae"
+                "reference": "1bc8804bd95eb1aef24a38a66c8841406004f13d"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/aanndryyyy/e-financials-php-client/zipball/1c8e2a6c244836f4d48a033da8603645b7394dae",
-                "reference": "1c8e2a6c244836f4d48a033da8603645b7394dae",
+                "url": "https://api.github.com/repos/aanndryyyy/e-financials-php-client/zipball/1bc8804bd95eb1aef24a38a66c8841406004f13d",
+                "reference": "1bc8804bd95eb1aef24a38a66c8841406004f13d",
                 "shasum": ""
             },
             "require": {
@@ -25,7 +25,7 @@
                 "php-http/discovery": "^1.20.0",
                 "psr/http-client": "^1.0.3",
                 "psr/http-client-implementation": "^1.0.1",
-                "psr/http-factory-implementation": "*",
+                "psr/http-factory-implementation": "^1.0",
                 "psr/http-message": "^2.0.0"
             },
             "require-dev": {
@@ -44,7 +44,6 @@
                 "phpstan/phpstan-strict-rules": "^2.0.12",
                 "symfony/var-dumper": "^8.1.2"
             },
-            "default-branch": true,
             "type": "library",
             "extra": {
                 "patches": {
@@ -93,7 +92,21 @@
                 ]
             },
             "license": [
-                "MIT"
+                "GPL-2.0-or-later",
+                "proprietary"
+            ],
+            "authors": [
+                {
+                    "name": "Arbictus OÜ",
+                    "email": "andry.pedak@arbictus.eu",
+                    "homepage": "https://arbictus.eu",
+                    "role": "Copyright holder"
+                },
+                {
+                    "name": "Andry Pedak",
+                    "email": "andry.pedak@arbictus.eu",
+                    "role": "Developer"
+                }
             ],
             "description": "PHP client for the e-Arveldaja / e-Financials REST API",
             "keywords": [
@@ -105,10 +118,11 @@
                 "sdk"
             ],
             "support": {
-                "source": "https://github.com/aanndryyyy/e-financials-php-client/tree/main",
-                "issues": "https://github.com/aanndryyyy/e-financials-php-client/issues"
+                "issues": "https://github.com/aanndryyyy/e-financials-php-client/issues",
+                "source": "https://github.com/aanndryyyy/e-financials-php-client",
+                "email": "andry.pedak@arbictus.eu"
             },
-            "time": "2026-08-03T08:05:58+00:00"
+            "time": "2026-08-06T09:30:23+00:00"
         },
         {
             "name": "guzzlehttp/guzzle",
@@ -3363,14 +3377,12 @@
     ],
     "aliases": [],
     "minimum-stability": "stable",
-    "stability-flags": {
-        "e-financials/php-client": 20
-    },
+    "stability-flags": {},
     "prefer-stable": false,
     "prefer-lowest": false,
     "platform": {
         "php": "^8.2"
     },
     "platform-dev": {},
-    "plugin-api-version": "2.9.0"
+    "plugin-api-version": "2.6.0"
 }

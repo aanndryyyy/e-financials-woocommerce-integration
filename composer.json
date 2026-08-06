@@ -23,7 +23,7 @@
     ],
     "require": {
         "php": "^8.2",
-        "e-financials/php-client": "dev-main#1c8e2a6c244836f4d48a033da8603645b7394dae",
+        "aanndryyyy/e-financials-php-client": "^0.1",
         "guzzlehttp/guzzle": "^7.5",
         "php-di/invoker": "^2.3",
         "php-di/php-di": "^7.1"
