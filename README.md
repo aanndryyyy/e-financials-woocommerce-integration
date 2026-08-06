@@ -111,3 +111,27 @@ and `woocommerce` organisations.
 **No e-Financials API calls happen in Playground.** The plugin talks to the API over Guzzle,
 which does not reach the network from WebAssembly, so the demo covers the admin UI, settings
 and order screens — not live syncing.
+
+## License
+
+Copyright (c) 2026 Arbictus OÜ.
+
+Free software under **[GPL-2.0-or-later](LICENSE)**. The plugin runs inside WordPress
+(GPL-2.0-or-later) and WooCommerce (GPL-3.0-or-later), so it is a derivative work and is
+distributed under GPL-compatible terms — as it must be.
+
+There is no restriction on production use, company size, or revenue, and no non-profit
+versus commercial distinction. You may run it on any number of sites, modify it, and
+redistribute it under the same terms, free of charge and forever.
+
+Paid subscriptions cover **automatic updates and support only** — a service, never
+permission to use the code. See **[COMMERCIAL.md](COMMERCIAL.md)**. When a subscription
+lapses the plugin keeps working; you simply stop receiving updates.
+
+The "Arbictus" name and logo, and the product name "e-Financials for WooCommerce", are
+trademarks and are not licensed by the GPL. Forks are welcome under a different name.
+
+## Disclaimer
+
+Independent, unofficial integration built against a public REST API. Not affiliated with,
+endorsed by, or supported by Registrite ja Infosüsteemide Keskus (RIK), or by Automattic, Inc.

@@ -43,6 +43,17 @@ Yes. Point the API base URL at the e-Financials test environment to try the sync
 Yes. VAT rates come from the order lines and are mapped to e-Financials sale articles, which is how
 e-Financials books VAT. Every rate used by the shop needs an entry in the VAT rate map.
 
+= Is the plugin free to use in production? =
+
+Yes. It is free software under GPLv2 or later, with no restriction on production use, company
+size or revenue. Paid subscriptions cover automatic updates and support only, never permission
+to run the plugin. See COMMERCIAL.md in the repository.
+
+= Is this an official RIK product? =
+
+No. It is an independent integration built against the public e-Financials REST API, and is not
+affiliated with or endorsed by Registrite ja Infosusteemide Keskus.
+
 == Changelog ==
 
 = 0.0.1 =

@@ -4,11 +4,16 @@
  *
  * @package Arbictus\EFinancialsPlugin
  *
+ * @copyright 2026 Arbictus OÜ
+ * @license   GPL-2.0-or-later
+ *
  * @wordpress-plugin
  * Plugin Name: e-Financials for WooCommerce
  * Plugin URI: https://github.com/aanndryyyy/e-financials-woocommerce-integration
  * Description: Bookkeeping sync between your shop and e-Financials (E-arveldaja liidestus).
  * Version: 0.0.1
+ * Author: Arbictus OÜ
+ * Author URI: https://arbictus.eu
  *
  * Requires at least: 6.0
  * Requires PHP: 8.2

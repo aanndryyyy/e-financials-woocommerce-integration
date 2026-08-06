@@ -2,7 +2,7 @@
     "name": "aanndryyyy/e-financials-woocommerce-integration",
     "description": "WooCommerce e-Financials integration for easy bookkeeping (e-Arveldaja WooCommerce liidestus).",
     "type": "wordpress-plugin",
-    "license": "GPLv2",
+    "license": "GPL-2.0-or-later",
     "autoload": {
         "psr-4": {
             "Aanndryyyy\\EFinancialsPlugin\\": "src/"
@@ -10,8 +10,15 @@
     },
     "authors": [
         {
+            "name": "Arbictus OÜ",
+            "email": "andry.pedak@arbictus.eu",
+            "homepage": "https://arbictus.eu",
+            "role": "Copyright holder"
+        },
+        {
             "name": "Andry Pedak",
-            "email": "andry.pedak@gmail.com"
+            "email": "andry.pedak@arbictus.eu",
+            "role": "Developer"
         }
     ],
     "require": {
