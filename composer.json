@@ -34,12 +34,6 @@
         "squizlabs/php_codesniffer": "^3.13",
         "wp-coding-standards/wpcs": "^3.4"
     },
-    "repositories": [
-        {
-            "type": "vcs",
-            "url": "https://github.com/aanndryyyy/e-financials-php-client.git"
-        }
-    ],
     "config": {
         "allow-plugins": {
             "bamarni/composer-bin-plugin": true,

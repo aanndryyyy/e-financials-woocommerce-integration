@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "cce57f421476c947bf8442279344eca6",
+    "content-hash": "f9ba133c958820fd4ef228a27dbc071c",
     "packages": [
         {
             "name": "aanndryyyy/e-financials-php-client",
@@ -53,44 +53,14 @@
                 }
             },
             "autoload": {
-                "psr-4": {
-                    "EFinancialsClient\\": "src/"
-                },
                 "files": [
                     "src/EFinancials.php"
-                ]
-            },
-            "autoload-dev": {
+                ],
                 "psr-4": {
-                    "Tests\\": "tests/"
+                    "EFinancialsClient\\": "src/"
                 }
             },
-            "scripts": {
-                "lint": [
-                    "pint -v --parallel"
-                ],
-                "test:lint": [
-                    "pint --test -v --parallel"
-                ],
-                "test:types": [
-                    "phpstan analyse --ansi"
-                ],
-                "test:type-coverage": [
-                    "phpstan analyse -c phpstan-type-coverage.neon.dist --ansi"
-                ],
-                "test:unit": [
-                    "pest --colors=always"
-                ],
-                "test:mutate": [
-                    "pest --mutate --parallel --everything --covered-only --min=20 --colors=always"
-                ],
-                "test": [
-                    "@test:lint",
-                    "@test:types",
-                    "@test:type-coverage",
-                    "@test:unit"
-                ]
-            },
+            "notification-url": "https://packagist.org/downloads/",
             "license": [
                 "GPL-2.0-or-later",
                 "proprietary"
@@ -118,9 +88,9 @@
                 "sdk"
             ],
             "support": {
+                "email": "andry.pedak@arbictus.eu",
                 "issues": "https://github.com/aanndryyyy/e-financials-php-client/issues",
-                "source": "https://github.com/aanndryyyy/e-financials-php-client",
-                "email": "andry.pedak@arbictus.eu"
+                "source": "https://github.com/aanndryyyy/e-financials-php-client"
             },
             "time": "2026-08-06T09:30:23+00:00"
         },
